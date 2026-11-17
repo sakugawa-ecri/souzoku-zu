@@ -1,0 +1,1979 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+
+<style>
+/* 公開用の土台（Claudeのページで自動的に付いていた最小限の設定） */
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;font:14px/1.5 system-ui,sans-serif}
+img{max-width:100%}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<a href="/api/logout" style="position:fixed;top:8px;right:12px;z-index:50;font:12px system-ui,sans-serif;background:#fff;border:1px solid #ccc;border-radius:6px;padding:4px 10px;color:#333;text-decoration:none" class="noprint">ログアウト</a>
+<style>@media print{.noprint{display:none!important}}</style>
+
+<title>相続関係説明図 試作</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Zen+Old+Mincho:wght@400;600&display=swap">
+<style>
+/* Layout: 左に用紙（A4縦の相続関係説明図）、右に判定・確認事項・不足戸籍・人物データ。狭い画面では縦に積む */
+:root{
+  --bg:#eceef2; --surface:#ffffff; --fg:#1b2230; --muted:#5a6375; --line:#d3d8e0;
+  --accent:#23446b; --accent-soft:#e2e9f2;
+  --warn:#8a5300; --warn-bg:#fcf1dc; --bad:#b42318; --bad-bg:#fcebe9; --good:#1d6b45; --good-bg:#e3f3ea;
+  --ui:"BIZ UDPGothic","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;
+  --mincho:"Zen Old Mincho","Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#11151c; --surface:#19202a; --fg:#e5e8ed; --muted:#9aa3b3; --line:#2d3542;
+  --accent:#93b3da; --accent-soft:#1e2a3a; --warn:#efb45a; --warn-bg:#2d2312; --bad:#f2958b; --bad-bg:#341a1a; --good:#7fd1a5; --good-bg:#16291f; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#11151c; --surface:#19202a; --fg:#e5e8ed; --muted:#9aa3b3; --line:#2d3542;
+  --accent:#93b3da; --accent-soft:#1e2a3a; --warn:#efb45a; --warn-bg:#2d2312; --bad:#f2958b; --bad-bg:#341a1a; --good:#7fd1a5; --good-bg:#16291f; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--ui);font-size:14px;line-height:1.7}
+.wrap{max-width:1360px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px;display:grid;gap:18px}
+header{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:end;justify-content:space-between}
+h1{font-family:var(--mincho);font-weight:600;font-size:1.55rem;margin:0;letter-spacing:.04em;text-wrap:balance}
+.sub{margin:2px 0 0;color:var(--muted);font-size:.86rem}
+.seg{display:flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--surface)}
+.seg button{font:inherit;font-size:.86rem;border:0;background:none;color:var(--fg);padding:8px 14px;cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--surface)}
+button:focus-visible,textarea:focus-visible,select:focus-visible,input:focus-visible,.file:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:18px;align-items:start}
+@media (max-width:1040px){.grid{grid-template-columns:minmax(0,1fr)}}
+.paper-scroll{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px}
+.paper-scroll svg{display:block;width:100%;min-width:620px;height:auto;box-shadow:0 1px 4px rgba(0,0,0,.18);background:#fff}
+.cap{margin:8px 2px 0;color:var(--muted);font-size:.8rem}
+.estate{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px;margin-bottom:12px}
+.estate h2{font-size:.78rem;letter-spacing:.12em;color:var(--muted);margin:0 0 8px;font-weight:700}
+.tabs{display:flex;flex-wrap:wrap;gap:8px}
+.tab{font:inherit;text-align:left;border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:6px;padding:7px 12px;cursor:pointer;display:grid;gap:1px;min-width:0}
+.tab[aria-selected="true"]{border-color:var(--accent);background:var(--accent-soft);box-shadow:inset 0 -3px 0 var(--accent)}
+.tab .n{font-weight:700;font-size:.9rem}
+.tab .r{font-size:.74rem;color:var(--muted)}
+.tab .k{font-size:.72rem;font-weight:700}
+.tab .k.bad{color:var(--bad)} .tab .k.good{color:var(--good)}
+.hold{border:2px solid var(--bad);background:var(--bad-bg);color:var(--fg);border-radius:6px;padding:12px 14px;margin-bottom:12px}
+.hold h2{margin:0 0 6px;font-size:.95rem;color:var(--bad);letter-spacing:.02em}
+.hold ul{margin:0;padding-left:1.2em;display:grid;gap:4px;font-size:.84rem}
+.hold li b{color:var(--bad)}
+.hold p{margin:8px 0 0;font-size:.8rem;color:var(--muted)}
+.tab .k.held{color:var(--bad);display:block}
+.ichitools{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:end;margin:-2px 0 12px;padding:10px 12px;background:var(--surface);border:1px solid var(--line);border-radius:6px}
+.ichitools .lbl{font-weight:700;font-size:.82rem}
+.ichitools .seg button{padding:6px 10px;font-size:.82rem}
+.txt{font:inherit;font-size:.86rem;padding:6px 8px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--fg);max-width:100%;box-sizing:border-box}
+.authorbox{display:grid;gap:4px;min-width:min(100%,22em)}
+.authorbox summary{font-weight:700;font-size:.82rem;cursor:pointer;color:var(--accent)}
+.authorbox[open]{grid-template-columns:auto minmax(0,1fr);align-items:center;gap:6px 8px}
+.authorbox[open] summary{grid-column:1/-1}
+.checklist{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:6px;font-size:.84rem}
+.checklist li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;align-items:start}
+.papertools{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-bottom:10px;font-size:.82rem;color:var(--muted);font-weight:700}
+.papertools .seg button{padding:6px 12px;font-size:.82rem}
+.addrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;font-size:.8rem;color:var(--muted)}
+aside{display:grid;gap:14px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px 16px;min-width:0}
+.panel h2{font-size:.78rem;letter-spacing:.12em;color:var(--muted);margin:0 0 10px;font-weight:700}
+.panel h2 .count{color:var(--bad);letter-spacing:0;margin-left:4px}
+.row{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:end}
+.field{display:grid;gap:4px;font-size:.82rem;min-width:0}
+.field label{font-weight:700}
+select{font:inherit;font-size:.86rem;padding:6px 8px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--fg);max-width:100%}
+.file{display:inline-flex;align-items:center;gap:8px;font-size:.84rem;padding:6px 12px;border:1px dashed var(--accent);border-radius:4px;color:var(--accent);cursor:pointer;font-weight:700}
+.file input{position:absolute;opacity:0;width:1px;height:1px}
+.check{display:inline-flex;gap:6px;align-items:center;font-size:.84rem;cursor:pointer}
+.hint{color:var(--muted);font-size:.78rem;margin:8px 0 0}
+.facts{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 12px;margin:0 0 12px;font-size:.84rem}
+.facts dt{color:var(--muted)} .facts dd{margin:0;font-weight:700}
+.note{font-size:.84rem;margin:0 0 8px}
+.chip{display:inline-block;font-size:.72rem;font-weight:700;padding:1px 8px;border-radius:99px;margin-right:6px;vertical-align:1px;white-space:nowrap}
+.chip.bad{background:var(--bad-bg);color:var(--bad)} .chip.warn{background:var(--warn-bg);color:var(--warn)} .chip.ok{background:var(--accent-soft);color:var(--accent)} .chip.good{background:var(--good-bg);color:var(--good)}
+.miss{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.miss li{border:1px solid var(--line);border-left:3px solid var(--bad);border-radius:4px;padding:8px 10px;font-size:.84rem}
+.miss b{display:block}
+.miss .why{color:var(--muted);font-size:.78rem}
+.tbl-scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.8rem;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:5px 6px;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:top}
+th{color:var(--muted);font-weight:700}
+td.num{text-align:right;font-weight:700}
+td.how{white-space:normal;min-width:8em}
+td.src{white-space:normal;color:var(--muted);min-width:9em}
+td.src.flag{color:var(--bad);font-weight:700}
+tr.total td{border-bottom:0;font-weight:700}
+details summary{cursor:pointer;font-size:.84rem;font-weight:700;color:var(--accent)}
+textarea{width:100%;box-sizing:border-box;min-height:260px;margin-top:10px;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:4px;padding:8px}
+.btn{font:inherit;font-size:.84rem;margin-top:8px;padding:6px 14px;border-radius:4px;border:1px solid var(--accent);background:var(--accent);color:var(--surface);cursor:pointer}
+.err{color:var(--bad);font-size:.8rem;margin:6px 0 0}
+.steps{margin:0 0 10px;padding-left:1.3em;font-size:.82rem;display:grid;gap:4px}
+.btn.ghost{background:none;color:var(--accent)}
+.hint.inline{display:inline-block;margin:0 0 0 8px}
+textarea.paste{min-height:110px}
+.sr{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>相続関係説明図 試作</h1>
+      <p class="sub">戸籍の読み取り結果から、相続人と持分を法律のルールで判定し、事務所の様式で図にします</p>
+    </div>
+    <div class="seg" role="group" aria-label="表示するデータ">
+      <button id="b-reading" type="button" aria-pressed="true">読み取り結果から作図</button>
+      <button id="b-suekichi" type="button" aria-pressed="false">末吉サンプル（様式の確認）</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <section>
+      <div class="estate" id="estate">
+        <h2>この案件の被相続人（相続関係説明図は被相続人ごとに作ります）</h2>
+        <div class="tabs" id="tabs" role="tablist" aria-label="被相続人"></div>
+        <div class="addrow">
+          <label for="addDec">ほかに亡くなった方の図も作る</label>
+          <select id="addDec"></select>
+        </div>
+      </div>
+      <div class="papertools" id="papertools">
+        <span>書類</span>
+        <div class="seg" role="group" aria-label="作る書類">
+          <button id="doc-souzoku" type="button" aria-pressed="true">相続関係説明図</button>
+          <button id="doc-ichiran" type="button" aria-pressed="false">法定相続情報一覧図</button>
+        </div>
+        <span id="shareLabel">持分</span>
+        <div class="seg" role="group" aria-label="持分の記載" id="shareSeg">
+          <button id="share-on" type="button" aria-pressed="true">記載する</button>
+          <button id="share-off" type="button" aria-pressed="false">記載しない</button>
+        </div>
+      </div>
+      <div class="ichitools" id="ichitools" hidden>
+        <div class="field"><span class="lbl">形式</span>
+          <div class="seg" role="group" aria-label="一覧図の形式">
+            <button id="style-zu" type="button" aria-pressed="true">図形式</button>
+            <button id="style-list" type="button" aria-pressed="false">列挙形式</button>
+          </div></div>
+        <div class="field"><span class="lbl">相続人の住所</span>
+          <div class="seg" role="group" aria-label="相続人の住所">
+            <button id="addr-on" type="button" aria-pressed="true">記載する</button>
+            <button id="addr-off" type="button" aria-pressed="false">記載しない</button>
+          </div></div>
+        <div class="field"><span class="lbl">数次相続の相続人</span>
+          <div class="seg" role="group" aria-label="数次相続の相続人の記載">
+            <button id="comb-on" type="button" aria-pressed="true">1枚にまとめる</button>
+            <button id="comb-off" type="button" aria-pressed="false">被相続人ごとに分ける</button>
+          </div></div>
+        <div class="field"><label for="applicant">申出人</label><select id="applicant"></select></div>
+        <div class="field"><label for="madeDate">作成日</label><input id="madeDate" type="text" class="txt" style="width:10em"></div>
+        <details class="field authorbox"><summary>作成者の記載</summary>
+          <label for="authName">名称</label><input id="authName" type="text" class="txt">
+          <label for="authMember">社員</label><input id="authMember" type="text" class="txt">
+          <label for="authOffice">事務所</label><input id="authOffice" type="text" class="txt">
+        </details>
+      </div>
+      <div class="hold" id="hold" role="alert" hidden></div>
+      <div class="paper-scroll" id="paper"></div>
+      <p class="cap" id="cap"></p>
+    </section>
+    <aside>
+      <div class="panel" id="gem">
+        <h2>Geminiアプリで読み取る（追加料金なし）</h2>
+        <ol class="steps">
+          <li>事務所のアカウントで Geminiアプリを開き、Gem を新しく作って、下のボタンでコピーした指示文を貼り付けて保存します（最初の1回だけ）。</li>
+          <li>その Gem に、1案件分の戸籍・住民票・附票のPDFをまとめてアップロードし、「読み取ってください」と送ります。</li>
+          <li>返ってきた回答をそのままコピーして、下の欄に貼り付け、「図にする」を押します。</li>
+        </ol>
+        <button class="btn ghost" id="copyGem" type="button">Gemの指示文をコピー</button>
+        <span class="hint inline" id="copyMsg" role="status"></span>
+        <textarea id="gemPaste" class="paste" spellcheck="false" aria-label="Geminiの回答" placeholder="Geminiの回答をここに貼り付けます（```json … ``` の部分を含めてそのままで大丈夫です）"></textarea>
+        <button class="btn" id="gemApply" type="button">図にする</button>
+        <p class="err" id="gemErr" hidden></p>
+        <textarea id="gemText" class="sr" readonly aria-label="Gemの指示文" tabindex="-1"></textarea>
+      </div>
+      <div class="panel" id="loader">
+        <h2>読み取り結果</h2>
+        <div class="row">
+          <div class="field">
+            <label for="sample">見本</label>
+            <select id="sample">
+              <option value="yamashiro">架空の事例（代襲・数次相続）</option>
+              <option value="kono">法務省の戸籍記載例（甲野家）</option>
+              <option value="oshiro">架空の事例（沖縄・昭和30年の家督相続）</option>
+              <option value="miyagi">架空の事例（前妻の子・数次相続）</option>
+              <option value="higa">架空の事例（兄弟姉妹が相続人）</option>
+            </select>
+          </div>
+          <label class="file" for="file">読み取り結果（JSON）を選ぶ
+            <input id="file" type="file" accept=".json,application/json">
+          </label>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <div class="field">
+            <label for="decedent">最初の被相続人（案件の起点）</label>
+            <select id="decedent"></select>
+          </div>
+          <div class="field">
+            <label for="region">適用地域</label>
+            <select id="region">
+              <option value="auto">本籍から自動判定</option>
+              <option value="okinawa">沖縄県</option>
+              <option value="mainland">沖縄県以外</option>
+            </select>
+          </div>
+        </div>
+        <p class="hint" id="source"></p>
+      </div>
+      <div class="panel" id="ichiranCheck" hidden></div>
+      <div class="panel" id="verdict"></div>
+      <div class="panel" id="needs"></div>
+      <div class="panel" id="checks"></div>
+      <div class="panel">
+        <h2>人物データ</h2>
+        <div class="tbl-scroll"><table id="people"></table></div>
+        <p class="hint" id="renHint">相続放棄は戸籍に載らないため、家庭裁判所の受理証明書で確認したうえでチェックしてください。</p>
+      </div>
+      <div class="panel">
+        <details>
+          <summary>データを直接編集する</summary>
+          <textarea id="json" spellcheck="false" aria-label="データ"></textarea>
+          <button class="btn" id="apply" type="button">図に反映</button>
+          <p class="err" id="err" hidden></p>
+        </details>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+ * 相続人・持分・不足戸籍の判定エンジン（試作）
+ * 入力：GASの読み取り結果（persons / documents / nextKoseki / uncertain）
+ * 法律の判断はここで決まったルールに従って計算し、AIには任せない。
+ * ========================================================= */
+
+/* ---------- 日付 ---------- */
+const ERA_START = { 明治:1868, 大正:1912, 昭和:1926, 平成:1989, 令和:2019 };
+const toHalf = s => String(s || "").replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/[\s　]/g, "");
+function wd(s){
+  const t = toHalf(s);
+  if (!t) return null;
+  const m = t.match(/(明治|大正|昭和|平成|令和)(元|\d+)年(\d+)月(\d+)日/);
+  if (m) return (ERA_START[m[1]] + (m[2] === "元" ? 1 : +m[2]) - 1) * 10000 + (+m[3]) * 100 + (+m[4]);
+  const g = t.match(/(\d{4})[年\/.-](\d{1,2})[月\/.-](\d{1,2})/);
+  return g ? +g[1] * 10000 + +g[2] * 100 + +g[3] : null;
+}
+
+/* ---------- 分数 ---------- */
+const gcd = (a, b) => { a = Math.abs(a); b = Math.abs(b); while (b) [a, b] = [b, a % b]; return a || 1; };
+const F = (n, d = 1) => { const g = gcd(n, d); return { n: n / g, d: d / g }; };
+const fmul = (a, b) => F(a.n * b.n, a.d * b.d);
+const fadd = (a, b) => F(a.n * b.d + b.n * a.d, a.d * b.d);
+const fsub = (a, b) => F(a.n * b.d - b.n * a.d, a.d * b.d);
+const fstr = f => f.n === f.d ? "全部" : `${f.d}分の${f.n}`;
+const lcm = (a, b) => a / gcd(a, b) * b;
+
+/* ---------- 適用する法律（被相続人の死亡日で決まる） ---------- */
+/* 沖縄県では昭和31年12月31日まで旧民法（家督相続）が適用され、昭和32年1月1日から新民法。
+ * 本土の応急措置法の時期（昭和22年5月3日〜12月31日）は沖縄県には当てはまらない。 */
+function eraOf(d, okinawa){
+  if (okinawa){
+    if (d <= 19561231) return "old_okinawa";
+    if (d < 19810101) return "C_okinawa";
+    return "D";
+  }
+  if (d < 19470503) return "old";
+  if (d < 19480101) return "B";
+  if (d < 19810101) return "C";
+  return "D";
+}
+const ERA_LABEL = {
+  old:         "旧民法・家督相続の時代（昭和22年5月2日以前の死亡）",
+  old_okinawa: "旧民法・家督相続の時代（沖縄県：昭和31年12月31日までに開始した相続）",
+  B:           "応急措置法（昭和22年5月3日〜同年12月31日の死亡）",
+  C:           "民法（昭和23年1月1日〜昭和55年12月31日の死亡）",
+  C_okinawa:   "民法（沖縄県：昭和32年1月1日〜昭和55年12月31日の死亡）",
+  D:           "民法（昭和56年1月1日以降の死亡）"
+};
+const isOldEra = e => e === "old" || e === "old_okinawa";
+const baseEra = e => e === "C_okinawa" ? "C" : e;
+const OKINAWA_KATOKU_NOTE = "沖縄県では、昭和31年12月31日までに開始した相続に旧民法（家督相続制度）が適用されます。昭和32年1月1日までとする文献もあるため、境界の日付の相続は適用する法律を確認してください。";
+
+/* 被相続人の死亡時の本籍が沖縄県か（opt.region で上書きできる） */
+function isOkinawa(M, p, opt){
+  if (opt.region === "okinawa") return { v: true, how: "手動で沖縄県を指定" };
+  if (opt.region === "mainland") return { v: false, how: "手動で沖縄県以外を指定" };
+  const S = (p.spans || []).map(s => Object.assign({}, s, { f: wd(s.from) })).sort((a, b) => (a.f || 0) - (b.f || 0));
+  const last = S[S.length - 1];
+  const doc = last ? M.docs[last.fileName] : (Object.values(M.docs).find(d => (p.appearsIn || []).includes(d.fileName)));
+  const honseki = doc ? doc.honseki || "" : "";
+  return { v: /沖縄/.test(honseki), how: honseki ? `最後の本籍（${honseki}）から判定` : "本籍が読み取れないため沖縄県以外として判定" };
+}
+/* 配偶者の相続分［第1順位, 第2順位, 第3順位と共同のとき］ */
+const SPOUSE_SHARE = {
+  B: [F(1,3), F(1,2), F(2,3)],
+  C: [F(1,3), F(1,2), F(2,3)],
+  D: [F(1,2), F(2,3), F(3,4)]
+};
+/* 兄弟姉妹の代襲：B なし／C 制限なし（再代襲あり）／D 甥姪まで */
+const SIBLING_REP_DEPTH = { B: 0, C: 99, D: 1 };
+const RANK_LABEL = { 1: "第1順位（子・その代襲相続人）", 2: "第2順位（直系尊属）", 3: "第3順位（兄弟姉妹・その代襲相続人）" };
+
+const CURRENT_KINDS = ["全部事項証明", "戸籍謄本", "個人事項証明", "戸籍抄本"];
+const ADDRESS_KINDS = ["住民票", "戸籍の附票"];
+const LAST_ADDRESS_KINDS = ["住民票の除票", "戸籍の附票", "戸籍の附票の除票"];
+const norm = s => String(s || "").replace(/[\s　]/g, "");
+
+/* ---------- 読み取り結果 → 判定用のモデル ---------- */
+function buildModel(r){
+  const P = (r.persons || []).map(p => Object.assign({}, p, { b: wd(p.birth), dd: wd(p.death) }));
+  const byId = Object.fromEntries(P.map(p => [p.id, p]));
+  const docs = Object.fromEntries((r.documents || []).map(d => [d.fileName, d]));
+  const keys = p => [p.name, ...(p.formerNames || [])].map(norm).filter(Boolean);
+  const findByName = nm => { const n = norm(nm); return n ? (P.find(p => keys(p).includes(n)) || null) : null; };
+  P.forEach(p => {
+    p._father = findByName(p.father); p._mother = findByName(p.mother);
+    p._af = findByName(p.adoptiveFather); p._am = findByName(p.adoptiveMother);
+    p._adopt = wd(p.adoptionDate);
+    p._mar = (p.marriages || []).map(m => ({ sp: byId[m.spouseId], m: wd(m.married), e: wd(m.ended), er: m.endReason || "" })).filter(x => x.sp);
+    (p.spouseIds || []).forEach(id => { if (byId[id] && !p._mar.some(x => x.sp === byId[id])) p._mar.push({ sp: byId[id], m: null, e: null, er: "" }); });
+  });
+  P.forEach(p => p._mar.forEach(x => { if (!x.sp._mar.some(y => y.sp === p)) x.sp._mar.push({ sp: p, m: x.m, e: x.e, er: x.er }); }));
+  /* 古い戸籍では、父母が同じ氏のとき母（または父）の氏が省略される（例：母「梅子」）。
+     氏名が完全に一致しない場合は、もう一方の親の配偶者のうち名が一致する人を親とする。 */
+  const sameGiven = (q, nm) => { const n = norm(nm); return n && keys(q).some(k => k.endsWith(n)); };
+  P.forEach(p => {
+    if (!p._mother && p.mother && p._father) p._mother = (p._father._mar.map(x => x.sp).find(sp => sameGiven(sp, p.mother))) || null;
+    if (!p._father && p.father && p._mother) p._father = (p._mother._mar.map(x => x.sp).find(sp => sameGiven(sp, p.father))) || null;
+    if (!p._am && p.adoptiveMother && p._af) p._am = (p._af._mar.map(x => x.sp).find(sp => sameGiven(sp, p.adoptiveMother))) || null;
+  });
+  const childrenOf = x => P.filter(c => c !== x && [c._father, c._mother, c._af, c._am].includes(x))
+                           .sort((a, b) => (a.b || 0) - (b.b || 0));
+  const parentsOf = x => [...new Set([x._father, x._mother, x._af, x._am].filter(Boolean))];
+  return { P, byId, docs, findByName, childrenOf, parentsOf };
+}
+
+/* 基準日 D における状態 */
+function st(p, D){
+  if (!p) return "unknown";
+  if (p.b && p.b > D) return "notborn";
+  if (!p.dd) return "alive";
+  if (p.dd < D) return "dead";
+  if (p.dd === D) return "same";
+  return "after";
+}
+const living = s => s === "alive" || s === "after";
+const isExcluded = p => (p.events || []).some(e => /廃除/.test((e.type || "") + (e.detail || "")));
+
+/* ---------- 不足戸籍の判定 ---------- */
+function makeCtx(M){
+  const notes = [], needs = new Map(), roles = new Map();
+  const ctx = {
+    notes, needs, roles,
+    role(p, role, from){ if (!roles.has(p.id)) roles.set(p.id, { p, role, from }); },
+    note(kind, title, text){ if (!notes.some(n => n[2] === text)) notes.push([kind, title, text]); },
+    add(key, item){ if (!needs.has(key)) needs.set(key, item); else { const it = needs.get(key); if (!it.why.includes(item.why)) it.why += "／" + item.why; } },
+    hint(p, date, side){
+      /* side: "before" = その日に入ってきた元の戸籍、"after" = その日に出ていった先の戸籍 */
+      const ev = (p.events || []).find(e => wd(e.date) === date && (e.relatedHonseki || e.relatedHittousha));
+      if (ev) return { where: ev.relatedHonseki || "（記載から確認）", head: ev.relatedHittousha || "", basis: `${ev.date} ${ev.type}の記載` };
+      return null;
+    },
+    spans(p){
+      return (p.spans || []).map(s => Object.assign({}, s, { f: wd(s.from), t: wd(s.to) }))
+        .sort((a, b) => (a.f || 0) - (b.f || 0));
+    },
+    /* 出生から死亡（生存中なら現在）まで、すき間なくつながっているか */
+    needCoverage(p, why){
+      const S = ctx.spans(p);
+      const label = p.dd ? "出生〜死亡" : "出生〜現在";
+      if (!S.length){
+        ctx.add(`cov:${p.id}:all`, { who: p.name, what: `${label}の戸籍`, where: "（本籍を確認）", head: "", why, basis: "読み取り結果にこの人が載っている期間がありません" });
+        return;
+      }
+      const docHint = (s, side) => {
+        const d = M.docs[s.fileName] || {};
+        return { where: d.honseki || "（本籍を確認）", head: d.hittousha || "", basis: `${s.fileName}の${side === "before" ? "改製" : "改製"}の記載` };
+      };
+      const first = S[0];
+      const startsAtBirth = first.fromReason === "出生" || (p.b && first.f && first.f <= p.b);
+      if (!startsAtBirth){
+        const h = first.fromReason === "改製" ? Object.assign(docHint(first), { what: "改製前の戸籍（改製原戸籍）" }) : ctx.hint(p, first.f, "before");
+        ctx.add(`cov:${p.id}:${first.f}`, { who: p.name, what: (h && h.what) || `出生〜${first.from}の戸籍`, period: `出生〜${first.from}`,
+          where: h ? h.where : "（本籍を確認）", head: h ? h.head : "", why, basis: h ? h.basis : `${first.fileName}に${first.from} ${first.fromReason || ""}で入籍` });
+      }
+      let reach = first.t, reachStr = first.to, reachSpan = first;
+      for (let i = 1; i < S.length && reach !== null; i++){
+        if (p.dd && reach >= p.dd) break;
+        const s = S[i];
+        if (s.f && s.f > reach){
+          const h = ctx.hint(p, reach, "after");
+          ctx.add(`cov:${p.id}:${reach}`, { who: p.name, what: `${reachStr}〜${s.from}の戸籍`, period: `${reachStr}〜${s.from}`,
+            where: h ? h.where : "（本籍を確認）", head: h ? h.head : "", why, basis: h ? h.basis : `${reachSpan.fileName}から${reachStr}に除籍` });
+        }
+        if (s.t === null){ reach = null; break; }
+        if (s.t > reach){ reach = s.t; reachStr = s.to; reachSpan = s; }
+      }
+      if (reach !== null && (!p.dd || reach < p.dd)){
+        let h = reachSpan.toReason === "改製" ? Object.assign(docHint(reachSpan), { what: "改製後の戸籍" }) : ctx.hint(p, reach, "after");
+        if (!(p.dd && reachSpan.toReason === "死亡")){
+          ctx.add(`cov:${p.id}:${reach}`, { who: p.name, what: (h && h.what) || `${reachStr}〜${p.dd ? "死亡" : "現在"}の戸籍`,
+            period: `${reachStr}〜${p.dd ? "死亡" : "現在"}`, where: h ? h.where : "（本籍を確認）", head: h ? h.head : "", why,
+            basis: h ? h.basis : `${reachSpan.fileName}から${reachStr} ${reachSpan.toReason || ""}で除籍` });
+        }
+      }
+    },
+    /* 生存している相続人の現在の戸籍（被相続人の死亡後に発行されたもの） */
+    needCurrent(p, after, afterStr){
+      const why = `相続人の現在の戸籍は、${afterStr}の死亡後に発行されたものが必要なため`;
+      const S = ctx.spans(p);
+      const open = S.filter(s => s.t === null && CURRENT_KINDS.includes((M.docs[s.fileName] || {}).kind));
+      if (!open.length){
+        const last = S[S.length - 1];
+        const h = last && last.t ? ctx.hint(p, last.t, "after") : null;
+        ctx.add(`cur:${p.id}`, { who: p.name, what: "現在の戸籍", where: h ? h.where : "（本籍を確認）", head: h ? h.head : "", why,
+          basis: h ? h.basis : !last ? "現在の戸籍が読み取り結果にありません"
+             : last.to ? `${last.fileName}から${last.to}に除籍` : `手元の${last.fileName}は${(M.docs[last.fileName] || {}).kind || "種類不明"}で、現在の戸籍として使えません` });
+        return;
+      }
+      const fresh = open.find(s => { const iss = wd((M.docs[s.fileName] || {}).issueDate); return iss && iss >= after; });
+      if (fresh) return;
+      const s = open[0], d = M.docs[s.fileName] || {};
+      ctx.add(`cur:${p.id}`, { who: p.name, what: "死亡後に発行された現在の戸籍（取り直し）", where: d.honseki || "（本籍を確認）", head: d.hittousha || "", why,
+        basis: d.issueDate ? `手元の${s.fileName}は${d.issueDate}発行で、死亡日より前のものです` : `${s.fileName}の発行日（認証日）が読み取れないため、死亡後の発行か確認できません` });
+    },
+    /* 相続人の現在の住所（住民票・戸籍の附票。被相続人の死亡後に発行されたもの） */
+    needAddress(p, after, afterStr){
+      const why = "相続関係説明図には相続人の現在の住所を書くため";
+      const a = p.currentAddress || {};
+      const d = M.docs[a.fileName] || {};
+      const iss = wd(d.issueDate);
+      const st = !a.address ? "none" : !ADDRESS_KINDS.includes(d.kind) ? "src" : !iss ? "nodate" : iss < after ? "old" : "ok";
+      p._addrOk = st === "ok";
+      if (st === "ok") return;
+      const basis = {
+        none: "住所が読み取り結果にありません",
+        src: `住所の読み取り元（${a.fileName || "不明"}）が住民票・戸籍の附票ではありません`,
+        nodate: `${a.fileName}の発行日が読み取れないため、現在の住所か確認できません`,
+        old: `${a.fileName}は${d.issueDate}発行で、${afterStr}の死亡日より前のものです。古い住所は使えません`
+      }[st];
+      ctx.add(`addr:${p.id}`, { who: p.name, what: st === "old" ? "現在の住所（住民票または戸籍の附票の取り直し）" : "現在の住所（住民票または戸籍の附票）",
+        where: st === "none" || st === "src" ? "住所地の市町村、または本籍地の市町村（附票）" : (d.honseki || "住所地の市町村"), head: "", why, basis });
+    },
+    /* 被相続人の最後の住所 */
+    needLastAddress(p){
+      const a = p.currentAddress || {};
+      const d = M.docs[a.fileName] || {};
+      if (a.address && LAST_ADDRESS_KINDS.includes(d.kind)) return;
+      ctx.add(`last:${p.id}`, { who: p.name, what: "最後の住所（住民票の除票または戸籍の附票）", where: "最後の住所地の市町村、または本籍地の市町村（附票）", head: "",
+        why: "相続関係説明図に被相続人の最後の住所を書くため", basis: a.address ? `住所の読み取り元（${a.fileName || "不明"}）が除票・附票ではありません` : "最後の住所が読み取り結果にありません" });
+    },
+    needByName(name, what, why){
+      ctx.add(`name:${name}:${what}`, { who: name, what, where: "（本籍を確認）", head: "", why, basis: "読み取り結果にこの人の戸籍がありません" });
+    }
+  };
+  return ctx;
+}
+
+/* ---------- 代襲相続人（株の中での割合つき） ---------- */
+function representatives(M, c, D, depthLeft, ctx, dec, isChildLine){
+  if (depthLeft <= 0) return [];
+  ctx.needCoverage(c, `${c.name}さんの子（代襲相続人）をすべて確認するため`);
+  if (dec) ctx.role(c, "被代襲者", dec);
+  const units = [];
+  M.childrenOf(c).forEach(g => {
+    const s = st(g, D);
+    if (s === "notborn") return;
+    if (ctx.curRen && ctx.curRen.has(g.id)) return;  /* 代襲相続人が放棄した場合も、その人は初めから相続人でない */
+    if (isChildLine && dec && (c._af === dec || c._am === dec) && c._adopt && g.b && g.b < c._adopt){
+      ctx.note("warn", "養子縁組前の子", `${g.name}さんは、${c.name}さんが被相続人と養子縁組をする前に生まれた子のため、代襲相続人になりません。`);
+      return;
+    }
+    if (living(s) && !isExcluded(g)) units.push([{ p: g, frac: F(1), how: `代襲（亡${c.name}の${g.relationToParents || "子"}）` }]);
+    else {
+      const sub = representatives(M, g, D, depthLeft - 1, ctx, dec, isChildLine);
+      if (sub.length) units.push(sub.map(u => Object.assign({}, u, { how: u.how.replace("代襲", "再代襲") })));
+    }
+  });
+  const n = units.length;
+  return units.flatMap(group => group.map(u => ({ p: u.p, frac: fmul(F(1, n), u.frac), how: u.how })));
+}
+
+/* ---------- 1回分の相続 ---------- */
+/* 被相続人（前戸主）から家督相続をした人を探す。家督相続人の身分事項に、前戸主として被相続人の名前がある記載 */
+function findKatoku(M, dec){
+  const names = [dec.name, ...(dec.formerNames || [])].map(norm).filter(Boolean);
+  for (const p of M.P){
+    if (p === dec) continue;
+    for (const e of (p.events || [])){
+      if (!/家督相続/.test(e.type || "")) continue;
+      const rel = norm(e.relatedHittousha), det = norm(e.detail);
+      /* 「前戸主蒲太死亡により」のように名だけ書かれている場合：家督相続人と同じ氏を除いた名で照合する */
+      const dn = norm(dec.name), hn = norm(p.name);
+      let k = 0; while (k < dn.length && dn[k] === hn[k]) k++;
+      const given = k >= 1 && dn.length - k >= 1 ? dn.slice(k) : "";
+      if (names.includes(rel) || names.some(n => det.includes(n)) || (given && /前戸主/.test(det) && det.includes("前戸主" + given))) {
+        const d = wd(e.date);
+        if (d) return { heir: p, date: d, dateStr: e.date, ev: e };
+      }
+    }
+  }
+  return null;
+}
+
+function inheritOnce(M, dec, opt, ctx, depth){
+  const D = dec.dd;
+
+  /* 家督相続：前戸主の死亡または隠居の日が旧民法の時代なら、家督相続人が1人で全部を承継する */
+  const kt = findKatoku(M, dec);
+  if (kt){
+    const okiK = isOkinawa(M, dec, opt);
+    const eraK = eraOf(kt.date, okiK.v);
+    if (isOldEra(eraK)){
+      const byRetire = (dec.events || []).some(e => /隠居/.test(e.type || "") && wd(e.date) === kt.date);
+      ctx.note("ok", "家督相続", `${kt.dateStr}、${kt.heir.name}さんが${dec.name}さんの家督相続人として、${byRetire ? "隠居" : "死亡"}による家督相続で全部を承継しています。図には被相続人と家督相続人（家督相続人が死亡している場合はその相続人）だけを書きます。`);
+      if (byRetire) ctx.note("warn", "隠居による家督相続", `家督相続は隠居の日（${kt.dateStr}）に開始しているため、死亡日ではなく隠居の日で法律を判定しています。${dec.death ? `${dec.name}さんの死亡（${dec.death}）時に残っていた財産の相続は、別に確認が必要です。` : ""}`);
+      if (eraK === "old_okinawa") ctx.note("warn", "沖縄県の特例", OKINAWA_KATOKU_NOTE);
+      if (okiK.v && (kt.date === 19561231 || kt.date === 19570101))
+        ctx.note("bad", "沖縄県・適用する法律の境界", `家督相続の日（${kt.dateStr}）は、沖縄県で旧民法から新民法に切り替わる境界の日です。${OKINAWA_KATOKU_NOTE}`);
+      return { era: eraK, okinawa: okiK, katoku: kt, refDate: kt.date, refStr: kt.dateStr, rank: null,
+               list: [{ p: kt.heir, share: F(1), how: `家督相続人（${kt.dateStr}家督相続）` }] };
+    }
+  }
+
+  const why0 = depth ? `数次相続：亡${dec.name}さんの相続人を確認するため` : "被相続人の出生から死亡までを確認するため";
+  ctx.needCoverage(dec, why0);
+  if (!D){
+    ctx.note("bad", "死亡日がありません", `${dec.name}さんの死亡の記載が読み取り結果にないため、相続人と持分を計算できません。死亡の記載がある戸籍を追加してください。`);
+    ctx.add(`death:${dec.id}`, { who: dec.name, what: "死亡の記載がある戸籍", where: "死亡時の本籍地", head: "", why: "相続の開始（死亡日）を確認するため", basis: "死亡の記載がありません" });
+    return null;
+  }
+  const oki = isOkinawa(M, dec, opt);
+  const era = eraOf(D, oki.v);
+  if (oki.v && (D === 19561231 || D === 19570101))
+    ctx.note("bad", "沖縄県・適用する法律の境界", `${dec.name}さんの死亡日（${dec.death}）は、沖縄県で旧民法から新民法に切り替わる境界の日です。${OKINAWA_KATOKU_NOTE}`);
+  if (isOldEra(era)){
+    const where = era === "old_okinawa"
+      ? `${dec.name}さんの相続は${dec.death}に開始しています。${OKINAWA_KATOKU_NOTE}`
+      : `${dec.name}さんの死亡は昭和22年5月2日以前のため、旧民法（家督相続制度）が適用されます。`;
+    ctx.note("bad", "家督相続の時代の相続", where + " 読み取り結果に、この方からの家督相続の記載が見つかりませんでした。戸主でない家族の死亡（遺産相続）の場合、この試作では相続人と持分を自動計算していません。家督相続の記載があるはずの場合は、読み取り漏れがないか確認してください。");
+    return { era, oldLaw: true, okinawa: oki, list: [] };
+  }
+  if (oki.v && depth === 0) ctx.note("ok", "沖縄県の相続", `${oki.how}。昭和32年1月1日以降に開始した相続のため、新民法で計算しています。`);
+  const E = baseEra(era);
+  /* 相続放棄は被相続人ごと（太郎さんの相続で放棄しても、春美さんの相続には影響しない） */
+  const ren = (opt.renouncedBy && opt.renouncedBy[dec.id]) || (depth === 0 && opt.renounced) || new Set();
+  ctx.curRen = ren;
+
+  /* 配偶者 */
+  const valid = dec._mar.filter(x => {
+    if (!living(st(x.sp, D))) return false;
+    if (x.m && x.m > D) return false;
+    if (x.e && x.e <= D && x.er !== "死亡") return false;
+    return true;
+  });
+  dec._mar.filter(x => x.e && x.e <= D && /離婚/.test(x.er || "") ).forEach(x =>
+    ctx.note("ok", "離婚した配偶者", `${x.sp.name}さんは${dec.name}さんと離婚しているため、${dec.name}さんの相続人ではありません。その間の子は相続人です。数次相続などで別の方の相続人になる場合は、その方の相続で計算します。`));
+  if (valid.length > 1) ctx.note("bad", "配偶者が複数", `${dec.name}さんの死亡時に婚姻中と読める配偶者が${valid.length}人います。離婚の記載を確認してください。`);
+  const spouse = valid[0] && !ren.has(valid[0].sp.id) ? valid[0].sp : null;
+
+  /* 非嫡出子の相続分 */
+  const illegitHalf = D < 20010701;
+  const weightChild = c => (c.legitimate === false && c._af !== dec && c._am !== dec && illegitHalf) ? 1 : 2;
+
+  /* 第1順位 */
+  let stocks = [];
+  M.childrenOf(dec).forEach(c => {
+    const s = st(c, D);
+    if (s === "notborn"){
+      if (c._father === dec && c.b - D < 10000){
+        ctx.note("warn", "胎児", `${c.name}さんは被相続人の死亡後に生まれています。胎児として相続人になります（民法886条）。`);
+        if (!ren.has(c.id)) stocks.push({ w: weightChild(c), units: [{ p: c, frac: F(1), how: `${c.relationToParents || "子"}（胎児）` }] });
+      }
+      return;
+    }
+    if (ren.has(c.id)) return;
+    if (s === "same") ctx.note("warn", "同時死亡", `${c.name}さんは被相続人と同じ日に死亡しています。同時死亡の推定（民法32条の2）により相続人とせず、代襲相続で計算しています。`);
+    if (living(s) && !isExcluded(c)){
+      stocks.push({ w: weightChild(c), units: [{ p: c, frac: F(1), how: c.relationToParents || "子" }] });
+    } else {
+      if (isExcluded(c)) ctx.note("warn", "推定相続人の廃除", `${c.name}さんに廃除の記載があります。相続人とせず、代襲相続で計算しています。`);
+      const u = representatives(M, c, D, 99, ctx, dec, true);
+      if (u.length) stocks.push({ w: weightChild(c), units: u });
+    }
+  });
+  if (D >= 20010701 && D <= 20130904 && M.childrenOf(dec).some(c => c.legitimate === false))
+    ctx.note("warn", "非嫡出子の相続分", "死亡日が平成13年7月1日〜平成25年9月4日のため、嫡出子と同じ相続分で計算しています。この期間の相続で遺産分割などがすでに確定している場合は、その結果が優先します。");
+
+  let rank = stocks.length ? 1 : null;
+
+  /* 第2順位 */
+  let provisional = false;
+  if (!rank){
+    const pars = M.parentsOf(dec);
+    const unknownNames = [dec.father, dec.mother].filter(n => n && !M.findByName(n));
+    /* 死亡の記載が読み取れていないが、年齢から明らかに死亡している父母（105歳以上）は、死亡したものとして先へ進む */
+    const now = new Date(), today = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
+    const presumed = p => !p.dd && p.b && today - p.b >= 1050000;
+    pars.filter(presumed).forEach(p => {
+      ctx.note("bad", "死亡の記載がない父母", `${p.name}さん（${p.birth}生まれ）は死亡の記載が読み取れていませんが、年齢から死亡しているものとして計算しています。戸籍の原本で死亡を確認してください。`);
+      ctx.add(`old:${p.id}`, { who: p.name, what: "死亡の記載の確認（読み取りの見直し）", where: "手元の戸籍の原本", head: "", why: "子がいないため、父母の死亡を確認して次の順位へ進むため", basis: "読み取り結果に死亡日がありません" });
+    });
+    const alive = pars.filter(p => living(st(p, D)) && !presumed(p) && !ren.has(p.id));
+    pars.forEach(p => { if (!living(st(p, D)) && !presumed(p)) ctx.needCoverage(p, `子がいないため、${p.name}さん（直系尊属）の死亡を確認するため`); });
+    if (alive.length){
+      rank = 2;
+      stocks = alive.map(p => ({ w: 2, units: [{ p, frac: F(1), how: p === dec._father ? "父" : p === dec._mother ? "母" : "養親" }] }));
+    } else {
+      if (unknownNames.length){
+        /* 父母の戸籍が読み取り結果にない：死亡していれば兄弟姉妹へ進むので、仮に死亡したものとして計算し、はっきり注意を出す */
+        provisional = true;
+        unknownNames.forEach(n => ctx.needByName(n, "死亡の記載がある戸籍（または現在の戸籍）", `子がいないため、${n}さん（直系尊属）の生死を確認するため`));
+        ctx.note("bad", "父母の生死が未確認", `${unknownNames.join("、")}さんの生死が読み取り結果で確認できません。仮に死亡したものとして、兄弟姉妹の判定に進んでいます。生存していれば、父母が相続人になります。`);
+      }
+      /* 父母がいない（死亡・放棄）ときは、次に近い直系尊属（祖父母）が相続人になる（民法889条1項1号ただし書）。
+         離婚した元配偶者も、孫から見れば祖父母に当たるため、ここで相続人になることがある。 */
+      const gpPersons = [...new Set(pars.flatMap(p => M.parentsOf(p)))].filter(g => g !== dec);
+      gpPersons.filter(presumed).forEach(g => {
+        ctx.note("bad", "死亡の記載がない祖父母", `${g.name}さん（${g.birth}生まれ）は死亡の記載が読み取れていませんが、年齢から死亡しているものとして計算しています。戸籍の原本で死亡を確認してください。`);
+        ctx.add(`old:${g.id}`, { who: g.name, what: "死亡の記載の確認（読み取りの見直し）", where: "手元の戸籍の原本", head: "", why: "父母がいないため、祖父母の死亡を確認して次の順位へ進むため", basis: "読み取り結果に死亡日がありません" });
+      });
+      const gpAlive = gpPersons.filter(g => living(st(g, D)) && !presumed(g) && !ren.has(g.id));
+      const gpUnknown = pars.flatMap(p => [p.father, p.mother].filter(n => n && !M.findByName(n)));
+      gpUnknown.forEach(n => ctx.needByName(n, "死亡の記載がある戸籍（または現在の戸籍）", "父母が先に死亡しているため、祖父母（直系尊属）が相続人になるかを確認するため"));
+      if (gpAlive.length){
+        rank = 2;
+        stocks = gpAlive.map(g => ({ w: 2, units: [{ p: g, frac: F(1), how: "直系尊属（祖父母）" }] }));
+        ctx.note("warn", "祖父母が相続人", `父母がいないため、生存している祖父母（${gpAlive.map(g => g.name + "さん").join("、")}）が相続人になります。` +
+          (gpUnknown.length ? `${gpUnknown.join("、")}さんの生死が確認できていないため、生存していれば持分が変わります。` : ""));
+      } else if (!provisional) {
+        ctx.note("warn", "祖父母の確認", "父母はすでに死亡しています。" + (gpUnknown.length ? "祖父母の死亡を戸籍で確認したうえで、" : "") + "兄弟姉妹の判定に進んでいます。");
+      }
+    }
+  }
+
+  /* 第3順位 */
+  if (!rank){
+    const pars = M.parentsOf(dec);
+    const bio = [dec._father, dec._mother].filter(Boolean);
+    pars.forEach(p => ctx.needCoverage(p, `兄弟姉妹をすべて確認するため（${p.name}さんの出生から死亡まで）`));
+    [dec.father, dec.mother].filter(n => n && !M.findByName(n))
+      .forEach(n => ctx.needByName(n, "出生〜死亡の戸籍", "兄弟姉妹をすべて確認するため"));
+    /* 兄弟姉妹：父母が人物として読み取れていない場合も、父母欄の氏名が同じ人を兄弟姉妹とする */
+    const sameF = x => (dec._father && x._father === dec._father) || (!dec._father && norm(dec.father) && norm(x.father) === norm(dec.father));
+    const sameM = x => (dec._mother && x._mother === dec._mother) || (!dec._mother && norm(dec.mother) && norm(x.mother) === norm(dec.mother));
+    const sibs = M.P.filter(x => x !== dec && (M.parentsOf(x).some(p => pars.includes(p)) || sameF(x) || sameM(x)));
+    const bothKnown = !!norm(dec.father) && !!norm(dec.mother);
+    const repDepth = SIBLING_REP_DEPTH[E];
+    sibs.forEach(sb => {
+      const s = st(sb, D);
+      if (s === "notborn" || ren.has(sb.id)) return;
+      const full = sameF(sb) && sameM(sb);
+      const w = (bothKnown && !full && !(sb._af && pars.includes(sb._af))) ? 1 : 2;
+      const how = (sb.relationToParents || "兄弟姉妹") + (w === 1 ? "（半血）" : "");
+      if (living(s)) stocks.push({ w, units: [{ p: sb, frac: F(1), how: "兄弟姉妹・" + how }] });
+      else {
+        const u = representatives(M, sb, D, repDepth, ctx, dec, false);
+        if (u.length) stocks.push({ w, units: u });
+      }
+    });
+    if (stocks.length) rank = 3;
+  }
+
+  /* 持分 */
+  const list = [];
+  let rest = F(1);
+  if (spouse){
+    const sh = rank ? SPOUSE_SHARE[E][rank - 1] : F(1);
+    list.push({ p: spouse, share: sh, how: "配偶者" });
+    rest = fsub(F(1), sh);
+  }
+  if (rank){
+    const W = stocks.reduce((a, s) => a + s.w, 0);
+    stocks.forEach(s => s.units.forEach(u => list.push({ p: u.p, share: fmul(fmul(rest, F(s.w, W)), u.frac), how: u.how })));
+  }
+  if (!list.length) ctx.note("bad", "相続人がいません", `${dec.name}さんの相続人が見つかりません。相続人不存在（相続財産清算人）の可能性があります。戸籍の不足がないか先に確認してください。`);
+  return { era, okinawa: oki, rank, list, pending: provisional };
+}
+
+/* ---------- 数次相続まで含めた最終の相続人 ---------- */
+function resolve(M, dec, opt, ctx, depth = 0){
+  const r = inheritOnce(M, dec, opt, ctx, depth);
+  if (!r) return null;
+  const out = [];
+  r.list.forEach(h => {
+    const ref = r.refDate || dec.dd, refStr = r.refStr || dec.death;
+    if (st(h.p, ref) === "after" && depth < 3){
+      ctx.role(h.p, "数次相続", dec);
+      const sub = resolve(M, h.p, opt, ctx, depth + 1);
+      if (sub && sub.final.length){
+        ctx.note("ok", "数次相続", `${h.p.name}さんは${r.katoku ? "家督相続の後" : dec.name + "さんより後"}に死亡しているため、その持分（${fstr(h.share)}）を${h.p.name}さんの相続人に引き継いで計算しています。`);
+        sub.final.forEach(x => out.push({ p: x.p, share: fmul(h.share, x.share), how: `数次相続（亡${h.p.name}の${x.how}）`,
+          after: Math.max(x.after || 0, h.p.dd), afterStr: (x.after || 0) > h.p.dd ? x.afterStr : `亡${h.p.name}さん（${h.p.death}）` }));
+      } else {
+        out.push(Object.assign({}, h, { how: h.how + "（死亡・相続人調査未了）", pending: true, after: ref, afterStr: `${dec.name}さん（${refStr}）` }));
+      }
+    } else out.push(Object.assign({}, h, { after: ref, afterStr: `${depth ? "亡" : "被相続人"}${dec.name}さん（${refStr}）` }));
+  });
+  const merged = [];
+  out.forEach(x => {
+    const m = merged.find(y => y.p === x.p);
+    if (m){ m.share = fadd(m.share, x.share); m.how += "＋" + x.how; if (x.after > m.after){ m.after = x.after; m.afterStr = x.afterStr; } } else merged.push(Object.assign({}, x));
+  });
+  return { era: r.era, okinawa: r.okinawa, oldLaw: !!r.oldLaw, katoku: r.katoku || null, rank: r.rank, pending: !!r.pending, direct: r.list, final: merged };
+}
+
+/* ---------- まとめて判定 ---------- */
+function analyze(reading, decedentId, opt){
+  const M = buildModel(reading);
+  const dec = M.byId[decedentId] || M.P[0];
+  if (!dec) throw new Error("persons（人物）が1人も入っていません。");
+  const ctx = makeCtx(M);
+  const result = resolve(M, dec, opt, ctx, 0);
+  if (dec.dd && !(result && result.katoku)) ctx.needLastAddress(dec);
+  if (result){
+    const now = new Date(), today = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate();
+    result.final.filter(h => !h.p.dd && h.p.b && today - h.p.b >= 1050000).forEach(h => {
+      const age = Math.floor((today - h.p.b) / 10000);
+      ctx.note("bad", "死亡の記載の読み落とし？", `${h.p.name}さん（${h.p.birth}生まれ・${age}歳）を生存として計算しています。死亡の記載を読み落としている可能性が高いので、戸籍の原本を確認してください。`);
+      ctx.add(`old:${h.p.id}`, { who: h.p.name, what: "死亡の記載の確認（読み取りの見直し）", where: "手元の戸籍の原本", head: "",
+        why: `${age}歳で生存として扱っているため`, basis: "読み取り結果に死亡日がありません" });
+    });
+  }
+
+  /* 相続放棄の影響：放棄がない場合と比べて、順位の移動・増えた相続人・持分の変化を示す */
+  const renSet = opt.renouncedBy && opt.renouncedBy[dec.id];
+  if (result && renSet && renSet.size){
+    const names = [...renSet].map(id => M.byId[id]).filter(Boolean).map(p => p.name + "さん").join("、");
+    const baseOpt = Object.assign({}, opt, { renouncedBy: Object.assign({}, opt.renouncedBy, { [dec.id]: new Set() }) });
+    const base = resolve(M, dec, baseOpt, makeCtx(M), 0);
+    ctx.note("warn", "相続放棄", `${names}は${dec.name}さんの相続を放棄したものとして、初めから相続人でなかったものとして計算しています（民法939条）。放棄した人の子は代襲相続しません。`);
+    if (base){
+      if (base.rank !== result.rank)
+        ctx.note("bad", "相続放棄による順位の移動", `同順位の相続人が全員放棄したため、${base.rank ? RANK_LABEL[base.rank] : "なし"}から${result.rank ? RANK_LABEL[result.rank] : "配偶者のみ（または判定保留）"}に移りました。`);
+      const added = result.final.filter(h => !base.final.some(x => x.p === h.p));
+      if (added.length)
+        ctx.note("bad", "相続放棄で増えた相続人", `${added.map(h => h.p.name + "さん（" + fstr(h.share) + "）").join("、")}が新たに相続人になります。戸籍と現在の住所をそろえてください。`);
+      const changed = result.final.filter(h => { const x = base.final.find(y => y.p === h.p); return x && (x.share.n !== h.share.n || x.share.d !== h.share.d); });
+      if (changed.length && !result.pending)
+        ctx.note("ok", "持分の変化", changed.map(h => { const x = base.final.find(y => y.p === h.p); return `${h.p.name}さん ${fstr(x.share)} → ${fstr(h.share)}`; }).join("、"));
+    }
+    if (result.pending) ctx.note("bad", "放棄後の相続人が未確定", "放棄によって次の順位の相続人を調べる必要があります。「次に必要な戸籍」に出ている戸籍をそろえてください。");
+  }
+  if (result){
+    result.final.forEach(h => { if (!h.p.dd){ ctx.needCurrent(h.p, h.after, h.afterStr); ctx.needAddress(h.p, h.after, h.afterStr); } });
+    const sum = result.final.reduce((a, h) => fadd(a, h.share), F(0));
+    result.sum = sum;
+    result.lcd = result.final.reduce((a, h) => lcm(a, h.share.d), 1);
+  }
+  const relevant = new Set([...(result ? result.final.map(h => h.p) : []), ...M.childrenOf(dec)]);
+  const oldOnly = M.P.filter(p => p.onlyInOldRegister && relevant.has(p)).map(p => p.name + "さん");
+  if (oldOnly.length) ctx.note("bad", "見落とし注意", `${oldOnly.join("、")}は改製原戸籍・除籍にだけ載っています。改製後の戸籍だけを見ると見落とす人です。`);
+  (reading.uncertain || []).forEach(u =>
+    ctx.note("warn", "読み取りの確認", `${u.fileName}／${u.location}：「${u.reading}」と読みました。${u.reason}`));
+  /* 判定を保留している点（結果が変わる可能性がある点）をまとめる */
+  const HOLD_TITLES = ["死亡日がありません", "家督相続の時代の相続", "父母の生死が未確認", "死亡の記載がない父母", "死亡の記載がない祖父母", "死亡の記載の読み落とし？",
+                       "沖縄県・適用する法律の境界", "配偶者が複数", "放棄後の相続人が未確定"];
+  const holds = ctx.notes.filter(n => HOLD_TITLES.includes(n[1]) || (n[1] === "祖父母が相続人" && /生死が確認できていない/.test(n[2])))
+                         .map(n => ({ title: n[1], text: n[2] }));
+  if (result) result.final.filter(h => h.pending).forEach(h =>
+    holds.push({ title: "相続人の調査が未了", text: `${h.p.name}さんは死亡していますが、その相続人を確定できていないため、${h.p.name}さんの名前のまま持分を出しています。` }));
+  return { M, dec, result, notes: ctx.notes, needs: [...ctx.needs.values()], roles: [...ctx.roles.values()], holds };
+}
+
+if (typeof module !== "undefined") module.exports = { analyze, wd, fstr, F, ERA_LABEL, RANK_LABEL, OKINAWA_KATOKU_NOTE };
+
+</script>
+<script>
+/* 見本データ（GASの読み取り結果と同じ形） */
+
+/* 架空の事例：代襲相続と数次相続のルール確認用。実在の人物ではありません */
+const SAMPLE_YAMASHIRO = {
+  documents: [
+    { fileName:"山城太郎_改製原.pdf", kind:"改製原戸籍", issueDate:"令和5年4月20日", honseki:"沖縄県那覇市首里石嶺町三丁目10番地", hittousha:"山城太郎", registerEvents:"昭和40年6月1日 婚姻により編製。平成12年10月1日 改製により消除" },
+    { fileName:"山城太郎_全部事項.pdf", kind:"全部事項証明", issueDate:"令和5年4月20日", honseki:"沖縄県那覇市首里石嶺町三丁目10番地", hittousha:"山城太郎", registerEvents:"平成12年10月1日 改製" },
+    { fileName:"山城一郎_全部事項.pdf", kind:"全部事項証明", issueDate:"令和4年12月1日", honseki:"沖縄県浦添市字仲間200番地", hittousha:"山城一郎", registerEvents:"平成4年6月1日 婚姻により編製" },
+    { fileName:"比嘉健_全部事項.pdf", kind:"全部事項証明", issueDate:"令和6年3月1日", honseki:"沖縄県糸満市字糸満50番地", hittousha:"比嘉健", registerEvents:"平成9年3月3日 婚姻により編製" },
+    { fileName:"山城太郎_住民票除票.pdf", kind:"住民票の除票", issueDate:"令和5年4月20日", honseki:"", hittousha:"" },
+    { fileName:"山城花子_住民票.pdf", kind:"住民票", issueDate:"令和5年4月20日", honseki:"", hittousha:"" },
+    { fileName:"山城一郎_附票.pdf", kind:"戸籍の附票", issueDate:"令和5年4月25日", honseki:"沖縄県浦添市字仲間200番地", hittousha:"山城一郎" },
+    { fileName:"比嘉健_附票.pdf", kind:"戸籍の附票", issueDate:"令和5年5月1日", honseki:"沖縄県糸満市字糸満50番地", hittousha:"比嘉健" }
+  ],
+  persons: [
+    { id:"p1", name:"山城太郎", currentAddress:{ address:"沖縄県那覇市首里石嶺町三丁目10番1号", fileName:"山城太郎_住民票除票.pdf" }, birth:"昭和15年4月1日", death:"令和5年3月10日", father:"山城清", mother:"山城カマド", relationToParents:"長男", legitimate:true,
+      marriages:[{ spouseId:"p2", married:"昭和40年6月1日" }],
+      spans:[{ fileName:"山城太郎_改製原.pdf", from:"昭和40年6月1日", fromReason:"婚姻", to:"平成12年10月1日", toReason:"改製" },
+             { fileName:"山城太郎_全部事項.pdf", from:"平成12年10月1日", fromReason:"改製", to:"令和5年3月10日", toReason:"死亡" }],
+      events:[{ type:"婚姻", date:"昭和40年6月1日", detail:"宮城花子と婚姻", relatedHonseki:"沖縄県那覇市首里当蔵町一丁目5番地", relatedHittousha:"山城清" },
+              { type:"死亡", date:"令和5年3月10日", detail:"那覇市で死亡" }],
+      onlyInOldRegister:false, appearsIn:["山城太郎_改製原.pdf","山城太郎_全部事項.pdf"] },
+    { id:"p2", name:"山城花子", currentAddress:{ address:"沖縄県那覇市首里石嶺町三丁目10番1号", fileName:"山城花子_住民票.pdf" }, formerNames:["宮城花子"], birth:"昭和18年8月8日", father:"宮城正", mother:"宮城ツル", relationToParents:"長女", legitimate:true,
+      spans:[{ fileName:"山城太郎_改製原.pdf", from:"昭和40年6月1日", fromReason:"婚姻", to:"平成12年10月1日", toReason:"改製" },
+             { fileName:"山城太郎_全部事項.pdf", from:"平成12年10月1日", fromReason:"改製", to:"", toReason:"" }],
+      events:[{ type:"婚姻", date:"昭和40年6月1日", detail:"山城太郎と婚姻", relatedHonseki:"沖縄県那覇市泊二丁目3番地", relatedHittousha:"宮城正" }],
+      onlyInOldRegister:false, appearsIn:["山城太郎_改製原.pdf","山城太郎_全部事項.pdf"] },
+    { id:"p3", name:"山城一郎", birth:"昭和41年5月5日", death:"平成30年5月1日", father:"山城太郎", mother:"山城花子", relationToParents:"長男", legitimate:true,
+      marriages:[{ spouseId:"p6", married:"平成4年6月1日" }],
+      spans:[{ fileName:"山城太郎_改製原.pdf", from:"昭和41年5月5日", fromReason:"出生", to:"平成4年6月1日", toReason:"婚姻" },
+             { fileName:"山城一郎_全部事項.pdf", from:"平成4年6月1日", fromReason:"婚姻", to:"平成30年5月1日", toReason:"死亡" }],
+      events:[{ type:"婚姻", date:"平成4年6月1日", detail:"金城恵子と婚姻", relatedHonseki:"沖縄県浦添市字仲間200番地", relatedHittousha:"山城一郎" }],
+      onlyInOldRegister:true, appearsIn:["山城太郎_改製原.pdf","山城一郎_全部事項.pdf"] },
+    { id:"p4", name:"比嘉春美", formerNames:["山城春美"], birth:"昭和43年9月9日", death:"令和6年1月20日", father:"山城太郎", mother:"山城花子", relationToParents:"長女", legitimate:true,
+      marriages:[{ spouseId:"p8", married:"平成9年3月3日" }],
+      spans:[{ fileName:"山城太郎_改製原.pdf", from:"昭和43年9月9日", fromReason:"出生", to:"平成9年3月3日", toReason:"婚姻" },
+             { fileName:"比嘉健_全部事項.pdf", from:"平成9年3月3日", fromReason:"婚姻", to:"令和6年1月20日", toReason:"死亡" }],
+      events:[{ type:"婚姻", date:"平成9年3月3日", detail:"比嘉健と婚姻", relatedHonseki:"沖縄県糸満市字糸満50番地", relatedHittousha:"比嘉健" }],
+      onlyInOldRegister:true, appearsIn:["山城太郎_改製原.pdf","比嘉健_全部事項.pdf"] },
+    { id:"p5", name:"山城次郎", birth:"昭和46年2月2日", father:"山城太郎", mother:"山城花子", relationToParents:"二男", legitimate:true,
+      spans:[{ fileName:"山城太郎_改製原.pdf", from:"昭和46年2月2日", fromReason:"出生", to:"平成10年11月11日", toReason:"婚姻" }],
+      events:[{ type:"婚姻", date:"平成10年11月11日", detail:"婚姻", relatedHonseki:"沖縄県那覇市小禄一丁目8番地", relatedHittousha:"山城次郎" }],
+      onlyInOldRegister:true, appearsIn:["山城太郎_改製原.pdf"] },
+    { id:"p6", name:"山城恵子", formerNames:["金城恵子"], birth:"昭和44年1月1日", father:"金城勇", mother:"金城ウシ", relationToParents:"二女", legitimate:true,
+      spans:[{ fileName:"山城一郎_全部事項.pdf", from:"平成4年6月1日", fromReason:"婚姻", to:"", toReason:"" }],
+      onlyInOldRegister:false, appearsIn:["山城一郎_全部事項.pdf"] },
+    { id:"p7", name:"山城翔", birth:"平成5年7月7日", father:"山城一郎", mother:"山城恵子", relationToParents:"長男", legitimate:true,
+      spans:[{ fileName:"山城一郎_全部事項.pdf", from:"平成5年7月7日", fromReason:"出生", to:"令和2年10月10日", toReason:"婚姻" }],
+      events:[{ type:"婚姻", date:"令和2年10月10日", detail:"婚姻", relatedHonseki:"沖縄県宜野湾市字我如古300番地", relatedHittousha:"山城翔" }],
+      onlyInOldRegister:false, appearsIn:["山城一郎_全部事項.pdf"] },
+    { id:"p8", name:"比嘉健", currentAddress:{ address:"沖縄県糸満市字糸満50番地の2", fileName:"比嘉健_附票.pdf" }, birth:"昭和42年3月3日", father:"比嘉昇", mother:"比嘉トミ", relationToParents:"長男", legitimate:true,
+      spans:[{ fileName:"比嘉健_全部事項.pdf", from:"平成9年3月3日", fromReason:"婚姻", to:"", toReason:"" }],
+      onlyInOldRegister:false, appearsIn:["比嘉健_全部事項.pdf"] },
+    { id:"p9", name:"山城美咲", currentAddress:{ address:"沖縄県浦添市字仲間200番地の3", fileName:"山城一郎_附票.pdf" }, birth:"平成8年12月12日", father:"山城一郎", mother:"山城恵子", relationToParents:"長女", legitimate:true,
+      spans:[{ fileName:"山城一郎_全部事項.pdf", from:"平成8年12月12日", fromReason:"出生", to:"", toReason:"" }],
+      onlyInOldRegister:false, appearsIn:["山城一郎_全部事項.pdf"] },
+    { id:"p10", name:"比嘉結衣", currentAddress:{ address:"沖縄県糸満市字糸満50番地の2", fileName:"比嘉健_附票.pdf" }, birth:"平成10年10月10日", father:"比嘉健", mother:"比嘉春美", relationToParents:"長女", legitimate:true,
+      spans:[{ fileName:"比嘉健_全部事項.pdf", from:"平成10年10月10日", fromReason:"出生", to:"", toReason:"" }],
+      onlyInOldRegister:false, appearsIn:["比嘉健_全部事項.pdf"] },
+    /* 太郎さんの父母と兄（相続放棄で第3順位に移る場合の確認用）。戸籍はまだ取得していない想定 */
+    { id:"p11", name:"山城清", birth:"明治40年1月1日", death:"昭和50年1月1日", father:"山城蒲", mother:"山城ナビ", relationToParents:"長男", legitimate:true,
+      spans:[], onlyInOldRegister:false, appearsIn:[] },
+    { id:"p12", name:"山城カマド", birth:"明治42年1月1日", death:"昭和60年1月1日", father:"", mother:"", relationToParents:"長女", legitimate:true,
+      spans:[], onlyInOldRegister:false, appearsIn:[] },
+    { id:"p13", name:"山城勇", birth:"昭和12年1月1日", father:"山城清", mother:"山城カマド", relationToParents:"長男", legitimate:true,
+      spans:[], onlyInOldRegister:false, appearsIn:[] }
+  ],
+  nextKoseki: [],
+  uncertain: []
+};
+
+/* 法務省の戸籍記載例（甲野家）。見本の戸籍は生存中のもの */
+const SAMPLE_KONO = {
+  documents: [
+    { fileName:"戸籍見本.pdf 1頁", kind:"全部事項証明", honseki:"東京都千代田区平河町一丁目4番地", hittousha:"甲野義太郎", registerEvents:"平成23年4月1日 改製" },
+    { fileName:"戸籍見本.pdf 2頁", kind:"改製原戸籍", honseki:"東京都千代田区平河町一丁目4番地", hittousha:"甲野義太郎", registerEvents:"平成9年9月9日 東京都大田区蒲田五丁目13番地から転籍。平成23年4月1日 改製により消除" }
+  ],
+  persons: [
+    { id:"p1", name:"甲野義太郎", birth:"昭和46年6月21日", death:"", father:"甲野幸雄", mother:"甲野松子", relationToParents:"長男", legitimate:true,
+      marriages:[{ spouseId:"p2", married:"平成2年6月10日" }],
+      spans:[{ fileName:"戸籍見本.pdf 2頁", from:"平成9年9月9日", fromReason:"転籍", to:"平成23年4月1日", toReason:"改製" },
+             { fileName:"戸籍見本.pdf 1頁", from:"平成23年4月1日", fromReason:"改製", to:"", toReason:"" }],
+      events:[{ type:"婚姻", date:"平成2年6月10日", detail:"乙野梅子と婚姻", relatedHonseki:"東京都千代田区平河町一丁目4番地", relatedHittousha:"甲野幸雄" },
+              { type:"転籍", date:"平成9年9月9日", detail:"東京都大田区から転籍", relatedHonseki:"東京都大田区蒲田五丁目13番地", relatedHittousha:"甲野義太郎" }],
+      onlyInOldRegister:false, appearsIn:["戸籍見本.pdf 1頁","戸籍見本.pdf 2頁"] },
+    { id:"p2", name:"甲野梅子", formerNames:["乙野梅子"], birth:"昭和47年1月8日", death:"", father:"乙野忠治", mother:"乙野春子", relationToParents:"長女", legitimate:true,
+      spans:[{ fileName:"戸籍見本.pdf 2頁", from:"平成9年9月9日", fromReason:"転籍", to:"平成23年4月1日", toReason:"改製" },
+             { fileName:"戸籍見本.pdf 1頁", from:"平成23年4月1日", fromReason:"改製", to:"", toReason:"" }],
+      events:[{ type:"転籍", date:"平成9年9月9日", detail:"東京都大田区から転籍", relatedHonseki:"東京都大田区蒲田五丁目13番地", relatedHittousha:"甲野義太郎" }],
+      onlyInOldRegister:false, appearsIn:["戸籍見本.pdf 1頁","戸籍見本.pdf 2頁"] },
+    { id:"p3", name:"丙原啓太郎", formerNames:["甲野啓太郎"], birth:"平成3年11月2日", death:"", father:"甲野義太郎", mother:"甲野梅子", relationToParents:"長男", legitimate:true,
+      spans:[{ fileName:"戸籍見本.pdf 2頁", from:"平成9年9月9日", fromReason:"転籍", to:"平成22年11月9日", toReason:"婚姻" }],
+      events:[{ type:"婚姻", date:"平成22年11月9日", detail:"丙原桃子と婚姻（妻の氏を称する）", relatedHonseki:"東京都千代田区平河町一丁目4番地", relatedHittousha:"丙原桃子" }],
+      onlyInOldRegister:true, appearsIn:["戸籍見本.pdf 2頁"] }
+  ],
+  nextKoseki: [
+    { forPerson:"甲野義太郎", period:"平成2年〜平成9年", honseki:"東京都大田区蒲田五丁目13番地", hittousha:"甲野義太郎", reason:"改製原戸籍の戸籍事項に「平成9年9月9日 大田区から転籍」とあるため。" },
+    { forPerson:"甲野義太郎", period:"出生〜平成2年", honseki:"東京都千代田区平河町一丁目4番地", hittousha:"甲野幸雄", reason:"婚姻前の従前戸籍。さらにさかのぼる可能性があります。" }
+  ],
+  uncertain: []
+};
+
+/* 架空の事例：沖縄県・昭和30年に戸主が死亡（家督相続の時代）。実在の人物ではありません */
+const SAMPLE_OSHIRO = {
+  documents: [
+    { fileName:"大城蒲太_除籍.pdf", kind:"除籍謄本", honseki:"沖縄県島尻郡玉城村字前川100番地", hittousha:"大城蒲太",
+      registerEvents:"大正4年式戸籍。昭和30年5月1日 戸主蒲太死亡、長男一男が家督相続" }
+  ],
+  persons: [
+    { id:"p1", name:"大城蒲太", birth:"明治30年2月10日", death:"昭和30年5月1日", father:"大城蒲戸", mother:"大城マツ", relationToParents:"長男", legitimate:true,
+      marriages:[{ spouseId:"p2", married:"大正9年3月1日" }],
+      spans:[{ fileName:"大城蒲太_除籍.pdf", from:"明治30年2月10日", fromReason:"出生", to:"昭和30年5月1日", toReason:"死亡" }],
+      events:[{ type:"家督相続", date:"大正15年4月1日", detail:"前戸主蒲戸死亡により家督相続" },
+              { type:"死亡", date:"昭和30年5月1日", detail:"玉城村で死亡" }],
+      onlyInOldRegister:false, appearsIn:["大城蒲太_除籍.pdf"] },
+    { id:"p2", name:"大城ウシ", formerNames:["新垣ウシ"], birth:"明治33年7月7日", death:"昭和45年1月5日", father:"新垣蒲", mother:"新垣カナ", relationToParents:"二女", legitimate:true,
+      spans:[{ fileName:"大城蒲太_除籍.pdf", from:"大正9年3月1日", fromReason:"婚姻", to:"昭和30年5月1日", toReason:"家督相続により新戸籍" }],
+      onlyInOldRegister:false, appearsIn:["大城蒲太_除籍.pdf"] },
+    { id:"p3", name:"大城一男", birth:"大正10年6月6日", father:"大城蒲太", mother:"大城ウシ", relationToParents:"長男", legitimate:true,
+      spans:[{ fileName:"大城蒲太_除籍.pdf", from:"大正10年6月6日", fromReason:"出生", to:"昭和30年5月1日", toReason:"家督相続により新戸籍" }],
+      events:[{ type:"家督相続", date:"昭和30年5月1日", detail:"前戸主蒲太死亡により家督相続（届出 昭和30年6月1日）", relatedHonseki:"沖縄県島尻郡玉城村字前川100番地", relatedHittousha:"大城一男" }],
+      onlyInOldRegister:false, appearsIn:["大城蒲太_除籍.pdf"] },
+    { id:"p4", name:"大城カメ", birth:"大正13年9月9日", father:"大城蒲太", mother:"大城ウシ", relationToParents:"長女", legitimate:true,
+      spans:[{ fileName:"大城蒲太_除籍.pdf", from:"大正13年9月9日", fromReason:"出生", to:"昭和30年5月1日", toReason:"家督相続により新戸籍" }],
+      onlyInOldRegister:false, appearsIn:["大城蒲太_除籍.pdf"] }
+  ],
+  nextKoseki: [],
+  uncertain: []
+};
+
+
+/* 架空の事例：前妻の子がいる相続。前妻は被相続人の相続人ではないが、子の数次相続で相続人になる。実在の人物ではありません */
+const SAMPLE_MIYAGI = {
+  documents: [
+    { fileName:"宮城正男_改製原.pdf", kind:"改製原戸籍", issueDate:"令和5年6月1日", honseki:"沖縄県那覇市小禄五丁目3番地", hittousha:"宮城正男", registerEvents:"昭和50年4月1日 婚姻により編製。平成14年9月1日 改製により消除" },
+    { fileName:"宮城正男_全部事項.pdf", kind:"全部事項証明", issueDate:"令和5年6月1日", honseki:"沖縄県那覇市小禄五丁目3番地", hittousha:"宮城正男", registerEvents:"平成14年9月1日 改製" },
+    { fileName:"宮城健一_除籍.pdf", kind:"除籍謄本", issueDate:"令和5年6月1日", honseki:"沖縄県豊見城市字豊見城10番地", hittousha:"宮城健一", registerEvents:"平成20年5月5日 分籍により編製。令和5年2月1日 死亡により消除" },
+    { fileName:"新垣トシ_全部事項.pdf", kind:"全部事項証明", issueDate:"令和5年6月5日", honseki:"沖縄県糸満市字兼城20番地", hittousha:"新垣トシ", registerEvents:"昭和55年6月1日 離婚により編製" },
+    { fileName:"新垣トシ_附票.pdf", kind:"戸籍の附票", issueDate:"令和5年6月5日", honseki:"沖縄県糸満市字兼城20番地", hittousha:"新垣トシ" },
+    { fileName:"宮城正男_附票.pdf", kind:"戸籍の附票", issueDate:"令和5年6月1日", honseki:"沖縄県那覇市小禄五丁目3番地", hittousha:"宮城正男" }
+  ],
+  persons: [
+    { id:"m1", name:"宮城正男", birth:"昭和24年3月3日", death:"令和4年5月1日", father:"宮城正一", mother:"宮城カメ", relationToParents:"長男", legitimate:true,
+      currentAddress:{ address:"沖縄県那覇市小禄五丁目3番2号", fileName:"宮城正男_附票.pdf" },
+      marriages:[{ spouseId:"m2", spouseName:"新垣トシ", married:"昭和50年4月1日", ended:"昭和55年6月1日", endReason:"協議離婚" },
+                 { spouseId:"m4", spouseName:"宮城幸子", married:"昭和58年10月10日", ended:"", endReason:"" }],
+      spans:[{ fileName:"宮城正男_改製原.pdf", from:"昭和24年3月3日", fromReason:"出生", to:"平成14年9月1日", toReason:"改製" },
+             { fileName:"宮城正男_全部事項.pdf", from:"平成14年9月1日", fromReason:"改製", to:"令和4年5月1日", toReason:"死亡" }],
+      events:[{ type:"婚姻", date:"昭和50年4月1日", detail:"新垣トシと婚姻" },
+              { type:"離婚", date:"昭和55年6月1日", detail:"妻トシと協議離婚届出" },
+              { type:"婚姻", date:"昭和58年10月10日", detail:"大城幸子と婚姻" },
+              { type:"死亡", date:"令和4年5月1日", detail:"那覇市で死亡" }],
+      onlyInOldRegister:false, appearsIn:["宮城正男_改製原.pdf","宮城正男_全部事項.pdf"] },
+    { id:"m2", name:"新垣トシ", formerNames:["宮城トシ"], birth:"昭和26年7月7日", father:"新垣蒲助", mother:"新垣ウト", relationToParents:"長女", legitimate:true,
+      currentAddress:{ address:"沖縄県糸満市字兼城20番地の1", fileName:"新垣トシ_附票.pdf" },
+      spans:[{ fileName:"宮城正男_改製原.pdf", from:"昭和50年4月1日", fromReason:"婚姻", to:"昭和55年6月1日", toReason:"離婚" },
+             { fileName:"新垣トシ_全部事項.pdf", from:"昭和55年6月1日", fromReason:"離婚", to:"", toReason:"" }],
+      events:[{ type:"離婚", date:"昭和55年6月1日", detail:"夫正男と協議離婚届出、糸満市字兼城20番地に新戸籍編製", relatedHonseki:"沖縄県糸満市字兼城20番地", relatedHittousha:"新垣トシ" }],
+      onlyInOldRegister:true, appearsIn:["宮城正男_改製原.pdf","新垣トシ_全部事項.pdf"] },
+    { id:"m3", name:"宮城健一", birth:"昭和51年8月8日", death:"令和5年2月1日", father:"宮城正男", mother:"新垣トシ", relationToParents:"長男", legitimate:true,
+      spans:[{ fileName:"宮城正男_改製原.pdf", from:"昭和51年8月8日", fromReason:"出生", to:"平成14年9月1日", toReason:"改製" },
+             { fileName:"宮城正男_全部事項.pdf", from:"平成14年9月1日", fromReason:"改製", to:"平成20年5月5日", toReason:"分籍" },
+             { fileName:"宮城健一_除籍.pdf", from:"平成20年5月5日", fromReason:"分籍", to:"令和5年2月1日", toReason:"死亡" }],
+      events:[{ type:"分籍", date:"平成20年5月5日", detail:"豊見城市字豊見城10番地に分籍", relatedHonseki:"沖縄県豊見城市字豊見城10番地", relatedHittousha:"宮城健一" }],
+      onlyInOldRegister:false, appearsIn:["宮城正男_改製原.pdf","宮城正男_全部事項.pdf","宮城健一_除籍.pdf"] },
+    { id:"m4", name:"宮城幸子", formerNames:["大城幸子"], birth:"昭和30年1月20日", father:"大城勇", mother:"大城ナエ", relationToParents:"二女", legitimate:true,
+      currentAddress:{ address:"沖縄県那覇市小禄五丁目3番2号", fileName:"宮城正男_附票.pdf" },
+      spans:[{ fileName:"宮城正男_改製原.pdf", from:"昭和58年10月10日", fromReason:"婚姻", to:"平成14年9月1日", toReason:"改製" },
+             { fileName:"宮城正男_全部事項.pdf", from:"平成14年9月1日", fromReason:"改製", to:"", toReason:"" }],
+      onlyInOldRegister:false, appearsIn:["宮城正男_改製原.pdf","宮城正男_全部事項.pdf"] },
+    { id:"m5", name:"宮城愛", birth:"昭和60年4月4日", father:"宮城正男", mother:"宮城幸子", relationToParents:"長女", legitimate:true,
+      currentAddress:{ address:"沖縄県那覇市小禄五丁目3番2号", fileName:"宮城正男_附票.pdf" },
+      spans:[{ fileName:"宮城正男_改製原.pdf", from:"昭和60年4月4日", fromReason:"出生", to:"平成14年9月1日", toReason:"改製" },
+             { fileName:"宮城正男_全部事項.pdf", from:"平成14年9月1日", fromReason:"改製", to:"", toReason:"" }],
+      onlyInOldRegister:false, appearsIn:["宮城正男_改製原.pdf","宮城正男_全部事項.pdf"] }
+  ],
+  nextKoseki: [],
+  uncertain: []
+};
+
+/* 架空の事例：配偶者も子もなく、父母も死亡しているため、兄弟姉妹（異母弟・先に死亡した姉の子を含む）が相続人になる。実在の人物ではありません */
+const SAMPLE_HIGA = {
+  documents: [
+    { fileName:"比嘉太_除籍.pdf", kind:"除籍謄本", issueDate:"令和6年3月1日", honseki:"沖縄県宜野湾市字大山5番地", hittousha:"比嘉太", registerEvents:"昭和19年3月1日 婚姻により編製。平成10年1月1日 除籍" },
+    { fileName:"比嘉一_除籍.pdf", kind:"除籍謄本", issueDate:"令和6年3月1日", honseki:"沖縄県宜野湾市字大山5番地の2", hittousha:"比嘉一", registerEvents:"昭和50年4月1日 分籍により編製。令和6年1月1日 死亡により消除" }
+  ],
+  persons: [
+    { id:"h1", name:"比嘉一", birth:"昭和20年1月1日", death:"令和6年1月1日", father:"比嘉太", mother:"比嘉カマ", relationToParents:"長男", legitimate:true,
+      spans:[{ fileName:"比嘉太_除籍.pdf", from:"昭和20年1月1日", fromReason:"出生", to:"昭和50年4月1日", toReason:"分籍" },
+             { fileName:"比嘉一_除籍.pdf", from:"昭和50年4月1日", fromReason:"分籍", to:"令和6年1月1日", toReason:"死亡" }],
+      onlyInOldRegister:false, appearsIn:["比嘉太_除籍.pdf","比嘉一_除籍.pdf"] },
+    { id:"h2", name:"比嘉太", birth:"大正10年1月1日", death:"平成元年1月1日", relationToParents:"長男", legitimate:true,
+      marriages:[{ spouseId:"h3", married:"昭和19年3月1日", ended:"昭和28年1月1日", endReason:"死亡" }, { spouseId:"h7", married:"昭和29年5月1日" }],
+      spans:[{ fileName:"比嘉太_除籍.pdf", from:"昭和19年3月1日", fromReason:"婚姻", to:"平成元年1月1日", toReason:"死亡" }],
+      onlyInOldRegister:false, appearsIn:["比嘉太_除籍.pdf"] },
+    { id:"h3", name:"比嘉カマ", birth:"大正12年1月1日", death:"昭和28年1月1日", relationToParents:"長女", legitimate:true,
+      spans:[{ fileName:"比嘉太_除籍.pdf", from:"昭和19年3月1日", fromReason:"婚姻", to:"昭和28年1月1日", toReason:"死亡" }],
+      onlyInOldRegister:false, appearsIn:["比嘉太_除籍.pdf"] },
+    { id:"h4", name:"金城春子", formerNames:["比嘉春子"], birth:"昭和22年1月1日", death:"令和2年1月1日", father:"比嘉太", mother:"比嘉カマ", relationToParents:"長女", legitimate:true,
+      spans:[{ fileName:"比嘉太_除籍.pdf", from:"昭和22年1月1日", fromReason:"出生", to:"昭和45年1月1日", toReason:"婚姻" }],
+      onlyInOldRegister:false, appearsIn:["比嘉太_除籍.pdf"] },
+    { id:"h5", name:"金城翔太", birth:"昭和47年1月1日", father:"金城勇", mother:"金城春子", relationToParents:"長男", legitimate:true, spans:[], appearsIn:[] },
+    { id:"h6", name:"比嘉二郎", birth:"昭和25年1月1日", father:"比嘉太", mother:"比嘉カマ", relationToParents:"二男", legitimate:true,
+      spans:[{ fileName:"比嘉太_除籍.pdf", from:"昭和25年1月1日", fromReason:"出生", to:"昭和52年1月1日", toReason:"婚姻" }],
+      onlyInOldRegister:false, appearsIn:["比嘉太_除籍.pdf"] },
+    { id:"h7", name:"比嘉ウシ", birth:"昭和3年1月1日", death:"平成20年1月1日", relationToParents:"二女", legitimate:true,
+      spans:[{ fileName:"比嘉太_除籍.pdf", from:"昭和29年5月1日", fromReason:"婚姻", to:"平成20年1月1日", toReason:"死亡" }],
+      onlyInOldRegister:false, appearsIn:["比嘉太_除籍.pdf"] },
+    { id:"h8", name:"比嘉四郎", birth:"昭和31年1月1日", father:"比嘉太", mother:"比嘉ウシ", relationToParents:"三男", legitimate:true,
+      spans:[{ fileName:"比嘉太_除籍.pdf", from:"昭和31年1月1日", fromReason:"出生", to:"昭和60年1月1日", toReason:"婚姻" }],
+      onlyInOldRegister:false, appearsIn:["比嘉太_除籍.pdf"] }
+  ],
+  nextKoseki: [],
+  uncertain: []
+};
+
+if (typeof module !== "undefined") module.exports = { SAMPLE_YAMASHIRO, SAMPLE_KONO, SAMPLE_OSHIRO, SAMPLE_MIYAGI, SAMPLE_HIGA };
+
+</script>
+<script>
+/* 様式確認用：送っていただいた見本の相続関係説明図と同じ人物データ */
+const SUEKICHI = {
+  case:{ 最後の本籍:"沖縄県那覇市首里石嶺町二丁目○○番地", 最後の住所:"不明",
+         登記簿上の住所:"島尻郡伊是名村字諸見○○番地、那覇市首里石嶺町二丁目○○番地", 作成者:"司法書士法人エクリ" },
+  decName:"末吉サンプル",
+  root:{ dec:true, name:"末吉サンプル", birth:"明治16年3月22日", death:"昭和35年2月9日", src:"見本",
+    children:[
+      { rel:"長男", name:"末吉サンプルⅡ", birth:"明治39年12月20日", death:"昭和48年1月10日", note:"（昭和２９年１月１９日家督相続）", src:"見本",
+        spouse:{ rel:"妻", name:"末吉妻", birth:"大正5年5月19日", death:"平成15年3月15日", src:"見本" },
+        children:[
+          { rel:"長男", name:"末吉長男", birth:"昭和17年10月23日", death:"平成29年3月30日", src:"見本",
+            spouse:{ rel:"妻", name:"末吉長男の妻", birth:"昭和14年5月27日", src:"見本" },
+            children:[
+              { rel:"長女", name:"末吉長男の長女", birth:"昭和39年4月29日", src:"見本" },
+              { rel:"二女", name:"末吉長男の二女", birth:"昭和48年10月17日", src:"見本" },
+              { rel:"三女", name:"末吉長男の三女", birth:"昭和51年1月12日", src:"見本（「二女」と読める箇所を三女で入力）" },
+              { rel:"四女", name:"末吉長男の四女", birth:"昭和57年6月1日", src:"見本" }
+            ]},
+          { rel:"長女", name:"末吉長女", birth:"昭和22年8月24日", src:"見本" },
+          { rel:"二女", name:"末吉二女", birth:"昭和24年12月20日", death:"昭和28年11月11日", src:"見本" },
+          { rel:"三女", name:"末吉三女", birth:"昭和29年3月4日", src:"見本" },
+          { rel:"二男", name:"末吉二男", birth:"昭和33年1月27日", death:"令和6年8月24日", src:"見本" }
+        ]}
+    ]}
+};
+const SUEKICHI_NOTES = [
+  ["ok","様式","見出し枠、作成者、最後の本籍・住所、出生・死亡・続柄の書き方、婚姻の二重線、子への線、還付欄を再現しています。"],
+  ["warn","見本の確認","長男の3人目の子は、見本では「二女」と読めたため「三女」で入力しています。"],
+  ["ok","沖縄県の家督相続","サンプルⅡの「昭和29年1月19日家督相続」は、沖縄県では昭和31年12月31日まで旧民法（家督相続制度）が適用されるため、記載と矛盾しません（昭和32年1月1日までとする文献もあります）。"]
+];
+
+const SAMPLES = {
+  yamashiro: { data: SAMPLE_YAMASHIRO, label: "架空の事例（代襲・数次相続）。実在の人物ではありません", dec: "p1" },
+  kono:      { data: SAMPLE_KONO, label: "法務省の戸籍記載例（甲野家）。生存中の戸籍のため、持分は計算されません", dec: "p1" },
+  oshiro:    { data: SAMPLE_OSHIRO, label: "架空の事例（沖縄・昭和30年の家督相続）。実在の人物ではありません", dec: "p1" },
+  miyagi:    { data: SAMPLE_MIYAGI, label: "架空の事例（前妻の子・数次相続）。実在の人物ではありません", dec: "m1" },
+  higa:      { data: SAMPLE_HIGA, label: "架空の事例（兄弟姉妹が相続人）。実在の人物ではありません", dec: "h1" }
+};
+
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
+const clone = o => JSON.parse(JSON.stringify(o));
+const $ = id => document.getElementById(id);
+const spouseRelOf = p => /男/.test(p.relationToParents || "") ? "妻" : /女/.test(p.relationToParents || "") ? "夫" : "配偶者";
+
+/* ---------- 判定結果 → 図の形 ---------- */
+const exRelOf = p => /男/.test(p.relationToParents || "") ? "前妻" : /女/.test(p.relationToParents || "") ? "前夫" : "元配偶者";
+/* 離婚の記載（「昭和13年3月20日協議離婚」の形） */
+function divorceText(a, b, raw){
+  const evs = [...(a.events || []), ...((b && b.events) || [])].filter(e => /離婚/.test((e.type || "") + (e.detail || "")));
+  const ev = evs.find(e => raw.ended && wd(e.date) === wd(raw.ended)) || evs[0];
+  const date = (ev && ev.date) || raw.ended || "";
+  const src = (ev ? (ev.type || "") + (ev.detail || "") : "") + (raw.endReason || "");
+  const kind = (src.match(/(協議|調停|審判|判決|裁判|和解|認諾)離婚/) || [])[0] || "離婚";
+  return date + kind;
+}
+
+function buildDrawTree(a, opt){
+  const { M, dec, result } = a;
+  const shareOf = new Map((result ? result.final : []).map(h => [h.p.id, h.share]));
+  const used = new Set();
+  const mk = (p, rel) => ({ rel, name: p.name, birth: p.birth || "", death: p.death || null, dec: p === dec,
+    share: opt.showShare ? (shareOf.get(p.id) || null) : null, ren: opt.renounced.has(p.id),
+    src: (p.appearsIn || []).join("、"), flag: !!p.onlyInOldRegister, id: p.id,
+    heir: shareOf.has(p.id) && !p.dd, addr: (p.currentAddress || {}).address || "", addrOk: !!p._addrOk,
+    note: p === dec ? undefined : (p.events || []).filter(e => /家督相続/.test(e.type || "") && e.date).map(e => `（${e.date}家督相続）`).join("") || undefined });
+
+  /* その人の婚姻（相手が人物として読み取れていない場合も、婚姻の記載から相手の氏名を拾う） */
+  const marriagesOf = p => {
+    const out = [];
+    p._mar.forEach(x => {
+      const raw = (p.marriages || []).find(m => m.spouseId === x.sp.id) || (x.sp.marriages || []).find(m => m.spouseId === p.id) || {};
+      out.push({ sp: x.sp, name: x.sp.name, raw, divorced: /離婚/.test(raw.endReason || x.er || "") });
+    });
+    (p.marriages || []).filter(m => !M.byId[m.spouseId]).forEach(m => {
+      let name = m.spouseName || "";
+      if (!name){
+        const ev = (p.events || []).find(e => /婚姻/.test(e.type || "") && (!m.married || wd(e.date) === wd(m.married)));
+        name = ev ? ((ev.detail || "").match(/^(.+?)と婚姻/) || [])[1] || "" : "";
+      }
+      if (!name) return;
+      const divorced = /離婚/.test(m.endReason || "") || (!!m.ended && m.endReason !== "死亡" && (p.events || []).some(e => /離婚/.test(e.type || "")));
+      out.push({ sp: null, name, raw: m, divorced });
+    });
+    return out.sort((x, y) => (wd(x.raw.married) || 0) - (wd(y.raw.married) || 0));
+  };
+
+  /* 配偶者（前の配偶者は上、今の配偶者は下）と、婚姻ごとの子を付ける */
+  const family = (n, p, depth) => {
+    /* 生存している相続人（被相続人以外）の配偶者・子は書かない。ただし、その人自身が相続人なら書く */
+    const alive = p !== dec && !p.dd;
+    const keep = q => !alive || (q && shareOf.has(q.id));
+    const mars = marriagesOf(p).filter(o => keep(o.sp));
+    const active = [...mars].reverse().find(o => !o.divorced);
+    const groups = [];
+    mars.forEach(o => {
+      if (o.sp && used.has(o.sp)) return;
+      const rel = o.divorced ? exRelOf(p) : spouseRelOf(p);
+      let spNode;
+      if (o.sp){ used.add(o.sp); spNode = mk(o.sp, rel); }
+      else spNode = { rel, name: o.name, nameOnly: true };
+      if (o.divorced){ spNode.ex = true; spNode.divorce = divorceText(p, o.sp, o.raw); }
+      groups.push({ sp: spNode, person: o.sp, name: o.name, pos: o === active ? "below" : "above", kids: [] });
+    });
+    if (depth < 4){
+      M.childrenOf(p).filter(c => !used.has(c) && keep(c)).forEach(c => {
+        const other = c._father === p ? c._mother : c._mother === p ? c._father : null;
+        let g = groups.find(x => x.person && x.person === other)
+             || groups.find(x => !x.person && [c.father, c.mother].map(norm).includes(norm(x.name)));
+        if (!g){ g = groups.find(x => !x.sp); if (!g){ g = { sp: null, pos: "none", kids: [] }; groups.push(g); } }
+        g.kids.push(c);
+      });
+    }
+    groups.forEach(g => { g.kids = g.kids.filter(c => !used.has(c)).map(c => desc(c, c.relationToParents || "子", depth + 1)); });
+    n.groups = groups.filter(g => g.sp || g.kids.length);
+    return n;
+  };
+  const desc = (p, rel, depth) => { used.add(p); return family(mk(p, rel), p, depth); };
+
+  let root;
+  const rank = result && result.rank;
+  if (result && result.katoku){
+    /* 家督相続：被相続人と家督相続人だけを書く。家督相続人が死亡していれば、その相続人（子孫・配偶者）も書く */
+    used.add(dec);
+    root = mk(dec, "");
+    const h = result.katoku.heir;
+    root.groups = [{ sp: null, pos: "none", kids: [desc(h, h.relationToParents || "家督相続人", 1)] }];
+  } else if (rank === 2 || rank === 3){
+    const f = dec._father, mo = dec._mother;
+    const nameNode = (nm, rel) => ({ rel, name: nm, birth: "", death: null });
+    const pars = M.parentsOf(dec);
+    const sameF = x => (f && x._father === f) || (!f && norm(dec.father) && norm(x.father) === norm(dec.father));
+    const sameM = x => (mo && x._mother === mo) || (!mo && norm(dec.mother) && norm(x.mother) === norm(dec.mother));
+    const kids = rank === 3
+      ? M.P.filter(x => x === dec || M.parentsOf(x).some(p => pars.includes(p)) || sameF(x) || sameM(x)).sort((x, y) => (x.b || 0) - (y.b || 0))
+      : [dec];
+    const kidNode = k => {
+      if (k === dec){ used.add(dec); return family(mk(dec, ""), dec, 2); }
+      const half = !!norm(dec.father) && !!norm(dec.mother) && !(sameF(k) && sameM(k));
+      return desc(k, (k.relationToParents || "兄弟姉妹") + (half ? "（半血）" : ""), 3);
+    };
+    if (f){
+      /* 父を起点に、父の配偶者ごとに子を分ける（異母兄弟姉妹は、その母の下に書く） */
+      used.add(f);
+      root = mk(f, "父");
+      const mars = marriagesOf(f).filter(o => !(o.sp && used.has(o.sp)));
+      const active = [...mars].reverse().find(o => !o.divorced);
+      const groups = mars.map(o => {
+        const rel = o.divorced ? exRelOf(f) : spouseRelOf(f);
+        let n;
+        if (o.sp){ used.add(o.sp); n = mk(o.sp, rel); } else n = { rel, name: o.name, nameOnly: true };
+        if (o.divorced){ n.ex = true; n.divorce = divorceText(f, o.sp, o.raw); }
+        return { sp: n, person: o.sp, name: o.name, pos: o === active ? "below" : "above", kids: [] };
+      });
+      if (!groups.some(g => (mo && g.person === mo) || (!mo && norm(g.name) === norm(dec.mother))) && dec.mother){
+        if (mo) used.add(mo);
+        groups.push({ sp: mo ? mk(mo, spouseRelOf(f)) : nameNode(dec.mother, spouseRelOf(f)), person: mo, name: dec.mother, pos: "below", kids: [] });
+      }
+      kids.forEach(k => {
+        let g = groups.find(x => x.person && x.person === k._mother) || groups.find(x => !x.person && norm(x.name) === norm(k.mother));
+        if (!g){ g = groups.find(x => !x.sp); if (!g){ g = { sp: null, pos: "none", kids: [] }; groups.push(g); } }
+        g.kids.push(k);
+      });
+      groups.forEach(g => { g.kids = g.kids.map(kidNode); });
+      root.groups = groups.filter(g => g.sp || g.kids.length);
+    } else {
+      root = nameNode(dec.father || "（父）", "父");
+      let momNode = null;
+      if (mo){ used.add(mo); momNode = mk(mo, "母"); } else if (dec.mother) momNode = nameNode(dec.mother, "母");
+      root.groups = [{ sp: momNode, pos: momNode ? "below" : "none", kids: kids.map(kidNode) }];
+    }
+  } else {
+    root = desc(dec, "", 0);
+  }
+  const lastSpan = (dec.spans || []).slice(-1)[0];
+  const lastDoc = lastSpan ? M.docs[lastSpan.fileName] : null;
+  const outside = result ? result.final.filter(h => !used.has(h.p)).map(h => h.p.name) : [];
+  const katokuBanner = result && (result.oldLaw || result.katoku)
+    ? (result.era === "old_okinawa"
+        ? ["※ 確認用：沖縄県の特例により旧民法（家督相続制度）が適用される相続です。",
+           "　 沖縄県では昭和31年12月31日までに開始した相続に適用（昭和32年1月1日までとする文献あり）。"]
+        : ["※ 確認用：昭和22年5月2日以前に開始した相続のため、旧民法（家督相続制度）が適用されます。"])
+    : [];
+  const holdBanner = (a.holds && a.holds.length) ? [`※ 暫定：判定を保留している点が${a.holds.length}件あります（${a.holds.map(h => h.title).join("・")}）。このまま提出しないでください。`] : [];
+  const banner = [...holdBanner, ...katokuBanner];
+  return {
+    tree: { decName: dec.name, root,
+            banner: banner.length ? banner : null,
+            case: { 最後の本籍: (lastDoc && lastDoc.honseki) || "", 最後の住所: (dec.currentAddress && dec.currentAddress.address) || "（住民票の除票で確認）", 登記簿上の住所: "", 作成者: "司法書士法人エクリ" } },
+    outside
+  };
+}
+
+/* ---------- 図の描画 ---------- */
+const LH = 16, FS = 11.5, G = 74, COL = 205, PADV = 28, PW = 900;
+/* 住所の折り返し：15文字以内で、県・市・郡・町・村・区・字・目の直後を優先して改行する */
+const chunk = (s, n) => {
+  const out = []; let a = [...s];
+  while (a.length > n){
+    let cut = -1;
+    for (let i = n; i >= 4; i--) if (/[県市郡町村区字目]/.test(a[i - 1])){ cut = i; break; }
+    if (cut < 0) cut = n;
+    out.push(a.slice(0, cut).join("")); a = a.slice(cut);
+  }
+  if (a.length) out.push(a.join(""));
+  return out;
+};
+function personLines(p){
+  if (p.lines) return p.lines;
+  if (p.nameOnly || (p.ex && !p.heir && !p.share)){
+    const L = [{ t: (p.rel || "") + "　" + p.name }];
+    if (p.divorce) L.push({ t: p.divorce });
+    return L;
+  }
+  const L = [];
+  if (p.heir){
+    if (p.addr) chunk(p.addr, 15).forEach((t, i) => L.push({ t: (i ? "　　　" : "住所　") + t, miss: !p.addrOk }));
+    else L.push({ t: "住所　（未確認）", miss: true });
+  }
+  L.push({ t: "出生　" + (p.birth || "（未確認）") });
+  if (p.death) L.push({ t: "死亡　" + p.death });
+  else if (p.dec) L.push({ t: "死亡　（未取得）", miss: true });
+  if (p.dec){ L.push({ t: "（被相続人）" }); L.push({ t: p.name }); }
+  else L.push({ t: (p.rel || "") + "　" + p.name });
+  if (p.divorce) L.push({ t: p.divorce });
+  if (p.note) L.push({ t: p.note });
+  if (p.ren) L.push({ t: "（相続放棄）" });
+  if (p.share) L.push({ t: "持分　" + fstr(p.share), share: true });
+  return L;
+}
+const textW = s => [...s].reduce((w, ch) => w + (ch.charCodeAt(0) > 255 ? FS : FS * .6), 0);
+
+/* 以前の形（spouse / children）の図のデータを、配偶者ごとの形（groups）にそろえる */
+function normalizeNode(n){
+  if (n.groups) return;
+  n.groups = [];
+  if (n.spouse) n.groups.push({ sp: n.spouse, pos: "below", kids: n.children || [] });
+  else if (n.children && n.children.length) n.groups.push({ sp: null, pos: "none", kids: n.children });
+}
+function renderPaper(d){
+  /* 一覧図はA4 1枚に収めるため、列を広く・行間を詰める */
+  const ich = d.kind === "ichiran";
+  const COLx = ich ? 262 : COL, PADVx = ich ? 14 : PADV, Gx = ich ? 46 : G;
+  const H = new Map(), out = [];
+  const sides = p => ({ above: p.groups.filter(g => g.sp && g.pos === "above"), below: p.groups.filter(g => g.sp && g.pos === "below"), none: p.groups.filter(g => !g.sp) });
+  const measure = p => {
+    normalizeNode(p);
+    const { above, below } = sides(p);
+    const blocks = [...above.map(g => g.sp), p, ...below.map(g => g.sp)];
+    const stack = blocks.reduce((a, b) => a + personLines(b).length * LH, 0) + Gx * (blocks.length - 1);
+    let ch = 0; p.groups.forEach(g => g.kids.forEach(c => ch += measure(c)));
+    const h = Math.max(stack, ch) + PADVx;
+    H.set(p, { h, ch }); return h;
+  };
+  const line = (x1,y1,x2,y2) => out.push(`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#111" stroke-width="1.2"/>`);
+  let maxY = 0, minY = Infinity;
+  const block = (L, x, top) => { maxY = Math.max(maxY, top + L.length * LH); minY = Math.min(minY, top); L.forEach((l, i) =>
+    out.push(`<text x="${x}" y="${top + i*LH + 12}" fill="${l.miss ? "#c0261b" : l.share ? "#1f4e86" : "#111"}"${l.share ? ' font-weight="600"' : ""}>${esc(l.t)}</text>`)); };
+
+  const place = (p, x, y) => {
+    const { h, ch } = H.get(p);
+    const { above, below, none } = sides(p);
+    let yy = y + (h - ch) / 2;
+    const anc = new Map();
+    [...above, ...none, ...below].forEach(g => anc.set(g, g.kids.map(c => { const a = place(c, x + COLx, yy); yy += H.get(c).h; return a; })));
+    const all = [...anc.values()].flat();
+    const cy = all.length ? (Math.min(...all) + Math.max(...all)) / 2 : y + h / 2;
+    const blocks = [...above.map(g => ({ n: g.sp, g })), { n: p, self: true }, ...below.map(g => ({ n: g.sp, g }))];
+    const hs = blocks.map(b => personLines(b.n).length * LH);
+    const selfIdx = above.length;
+    const primary = below[0] || above[above.length - 1];
+    let top;
+    if (primary){
+      const gapIdx = below[0] ? selfIdx : selfIdx - 1;
+      const a = anc.get(primary);
+      const target = a.length ? (Math.min(...a) + Math.max(...a)) / 2 : cy;
+      top = target - (hs.slice(0, gapIdx + 1).reduce((s, v) => s + v, 0) + Gx * gapIdx + Gx / 2);
+    } else top = cy - hs[0] / 2;
+    const tops = []; let cur = top;
+    blocks.forEach((b, i) => { tops.push(cur); block(personLines(b.n), x, cur); cur += hs[i] + Gx; });
+    const dx = x + 44, busBase = x + COLx - 24;
+    blocks.forEach((b, i) => {
+      if (b.self) return;
+      const gapTop = i < selfIdx ? tops[i] + hs[i] : tops[selfIdx] + hs[selfIdx];
+      const gapBot = gapTop + Gx, mid = (gapTop + gapBot) / 2;
+      line(dx-2, gapTop+5, dx-2, gapBot-5); line(dx+2, gapTop+5, dx+2, gapBot-5);
+      const a = anc.get(b.g);
+      if (a.length){
+        const bus = busBase - (b.g === primary ? 0 : 10);
+        line(dx + 2, mid, bus, mid);
+        line(bus, Math.min(mid, ...a), bus, Math.max(mid, ...a));
+        a.forEach(v => line(bus, v, x + COLx - 6, v));
+      }
+    });
+    none.forEach(g => {
+      const a = anc.get(g); if (!a.length) return;
+      const L = personLines(p), pc = tops[selfIdx] + hs[selfIdx] / 2;
+      const jx = x + Math.max(...L.map(l => textW(l.t))) + 8, bus = busBase - 5;
+      line(jx, pc, bus, pc);
+      line(bus, Math.min(pc, ...a), bus, Math.max(pc, ...a));
+      a.forEach(v => line(bus, v, x + COLx - 6, v));
+    });
+    return tops[selfIdx] + hs[selfIdx] / 2;
+  };
+
+  const treeH = measure(d.root);
+  if (d.kind === "ichiran"){
+    const PH = 1273, T0 = 120 + (d.banner ? d.banner.length * 15 : 0);
+    place(d.root, 60, T0);
+    if (minY < T0){ const shift = T0 - minY; out.length = 0; maxY = 0; minY = Infinity; place(d.root, 60, T0 + shift); }
+    return ichiranSheet(d, out.join(""), maxY, PH);
+  }
+  const T0 = d.banner ? 222 : 210;
+  const PH = Math.max(1273, T0 + treeH + 160);
+  const avail = PH - 130 - T0;
+  place(d.root, 55, T0 + Math.max(0, (avail - treeH) / 2));
+
+  const c = d.case || {}, fy = PH - 95;
+  return `<svg viewBox="0 0 ${PW} ${PH}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="相続関係説明図">
+  <rect width="${PW}" height="${PH}" fill="#fff"/>
+  <g font-family="'Zen Old Mincho','Hiragino Mincho ProN','Yu Mincho','Noto Serif JP',serif" font-size="${FS}" fill="#111">
+    <rect x="62" y="34" width="510" height="30" fill="none" stroke="#111" stroke-width="1.2"/>
+    <text x="72" y="55" font-size="15">${esc("被相続人　" + d.decName + "　相続関係説明図")}</text>
+    <text x="${PW-35}" y="98" text-anchor="end" font-size="12">${esc("作成者　" + (c.作成者 || ""))}</text>
+    <text x="70" y="128">最後の本籍</text><text x="170" y="128">${esc(c.最後の本籍)}</text>
+    <text x="70" y="144">最後の住所</text><text x="170" y="144">${esc(c.最後の住所)}</text>
+    <text x="70" y="160">登記簿上の住所</text><text x="170" y="160">${esc(c.登記簿上の住所)}</text>
+    ${(d.banner || []).map((t, i) => `<text x="70" y="${186 + i * 15}" fill="#b42318" font-size="11.5" font-weight="600">${esc(t)}</text>`).join("")}
+    ${out.join("")}
+    <rect x="598" y="${fy}" width="252" height="48" fill="none" stroke="#111" stroke-width="1"/>
+    <line x1="804" y1="${fy}" x2="804" y2="${fy+48}" stroke="#111" stroke-width="1"/>
+    <text x="606" y="${fy+29}" font-size="11">相続を証する書面は還付した</text>
+  </g></svg>`;
+}
+
+/* ---------- 法定相続情報一覧図 ---------- */
+const CERT_H = 214;   /* 用紙の下から約5cm（認証文の欄）。用紙幅900に対するA4の5cm */
+function warekiToday(){ const d = new Date(); return `令和${d.getFullYear() - 2018}年${d.getMonth() + 1}月${d.getDate()}日`; }
+
+/* 用紙の見出し・以下余白・作成者欄・認証文の余白（図形式と列挙形式で共通） */
+function ichiranSheet(d, body, maxY, PH){
+  const au = d.author || {};
+  const footer = [`作成日：${au.date || ""}`, `作成者：${au.name || ""}`, au.member ? `　　　　${au.member}` : "", au.office ? `（事務所：${au.office}）` : ""].filter(Boolean);
+  const endY = maxY + 34;
+  const fy = endY + 16, fh = footer.length * 17 + 16;
+  d._overflow = fy + fh > PH - CERT_H;
+  return `<svg viewBox="0 0 ${PW} ${PH}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="法定相続情報一覧図">
+  <rect width="${PW}" height="${PH}" fill="#fff"/>
+  <g font-family="'Zen Old Mincho','Hiragino Mincho ProN','Yu Mincho','Noto Serif JP',serif" font-size="${FS}" fill="#111">
+    <text x="${PW / 2}" y="72" font-size="16" text-anchor="middle">${esc("被相続人　" + d.decName + "　法定相続情報")}</text>
+    ${(d.banner || []).map((t, i) => `<text x="60" y="${100 + i * 15}" fill="#b42318" font-size="11.5" font-weight="600">${esc(t)}</text>`).join("")}
+    ${body}
+    <text x="${PW / 2}" y="${endY}" text-anchor="middle">以下余白</text>
+    <rect x="${PW - 470}" y="${fy}" width="420" height="${fh}" fill="none" stroke="#111" stroke-width="1"/>
+    ${footer.map((t, i) => `<text x="${PW - 460}" y="${fy + 20 + i * 17}">${esc(t)}</text>`).join("")}
+    <line x1="30" y1="${PH - CERT_H}" x2="${PW - 30}" y2="${PH - CERT_H}" stroke="#c9ced6" stroke-dasharray="6 5"/>
+    <text x="${PW / 2}" y="${PH - CERT_H + 22}" text-anchor="middle" fill="#9aa3b3" font-size="10.5">（確認用の目安）この下 約5cm は登記官が認証文を付ける欄のため、記載しません</text>
+    ${d._overflow ? `<text x="${PW / 2}" y="${PH - CERT_H - 10}" text-anchor="middle" fill="#b42318" font-weight="600">※ 作成者の枠の下に約5cmの余白が取れていません。2枚に分ける必要があります</text>` : ""}
+  </g></svg>`;
+}
+
+function buildIchiran(a, opt){
+  const { M, dec, result: r } = a;
+  if (!r || (r.oldLaw && !r.katoku)) return null;
+  const D = r.katoku ? r.katoku.date : dec.dd;
+  const heirMap = new Map(r.direct.map(h => [h.p.id, h]));
+  const sexOf = p => /男/.test(p.relationToParents || "") ? "男" : /女/.test(p.relationToParents || "") ? "女" : "";
+  const list = [];      /* 記載する相続人：{ p, rel, after（戸籍・住所はこの日より後の発行が必要）, owner（誰の相続人か） } */
+  const suji = [];      /* 数次相続の扱い：{ p, mode: "expand" | "sibling" | "separate", heirs, why } */
+  const placed = new Set();
+
+  /* 数次相続の相続人の判定は、その方を被相続人として計算し直す（結果は使い回す） */
+  const subCache = new Map();
+  const subOf = p => {
+    if (!subCache.has(p.id)){
+      const sa = analyze(opt.reading, p.id, { renouncedBy: {}, region: opt.region });
+      const sr = sa.result;
+      let plan;
+      if (!sr || sr.oldLaw || sr.katoku || sr.pending) plan = { mode: "separate", why: "相続人を確定できていない" };
+      else if (sr.rank === 1 || !sr.rank) plan = { mode: "expand" };
+      else plan = { mode: "sibling" };   /* 第2・第3順位：父母・兄弟姉妹が相続人。図の中の人と、親（配偶者）を示して表す */
+      plan.heirs = sr ? sr.direct : [];
+      plan.cx = { hm: new Map(plan.heirs.map(h => [h.p.id, h])), D: p.dd, owner: p };
+      subCache.set(p.id, plan);
+    }
+    return subCache.get(p.id);
+  };
+  const combinable = (p, cx) => opt.combine && p.dd && cx.D && p.dd > cx.D;
+
+  const heirNode = (p, rel, cx) => {
+    list.push({ p, rel, after: cx.D, owner: cx.owner });
+    placed.add(p);
+    const L = [];
+    if (opt.addr && !p.dd){
+      const ad = (p.currentAddress || {}).address;
+      if (ad) chunk(ad, 19).forEach((t, i) => L.push({ t: (i ? "　　　" : "住所　") + t, miss: !p._addrOk }));
+      else L.push({ t: "住所　（未確認）", miss: true });
+    }
+    L.push({ t: "出生　" + (p.birth || "（未確認）"), miss: !p.birth });
+    if (p.dd) L.push({ t: "死亡　" + p.death });
+    L.push({ t: `（${rel}）` });
+    L.push({ t: p.name + (p.id === opt.applicant ? "　（申出人）" : "") });
+    const n = { lines: L };
+    /* 被相続人より後に亡くなった相続人：A4 1枚に収まるなら、その方の相続人も同じ一覧図に書く */
+    if (p.dd && cx.D && p.dd > cx.D){
+      const plan = combinable(p, cx) ? subOf(p) : Object.assign({}, subOf(p), { mode: "separate",
+        why: opt.style === "list" ? "列挙形式では被相続人ごとに作る" : !opt.autoSplit ? "「被相続人ごとに分ける」を選んでいる" : "" });
+      suji.push({ p, plan });
+      if (plan.mode === "expand"){
+        const kids = kidsFor(p, plan.cx);
+        n.groups = spouseGroups(p, kids, c => childNode(c, p, plan.cx), plan.cx);
+      }
+    }
+    return n;
+  };
+  const label = t => ({ lines: [{ t: `（${t}）` }] });
+  /* 相続人ではないが、関係を示すために書く配偶者（被相続人より先に死亡した配偶者など） */
+  const recordNode = (q, rel) => {
+    placed.add(q);
+    const L = [{ t: "出生　" + (q.birth || "（未確認）"), miss: !q.birth }];
+    if (q.dd) L.push({ t: "死亡　" + q.death });
+    L.push({ t: `（${rel}）` }); L.push({ t: q.name });
+    return { lines: L };
+  };
+  const childRel = (c, par) => (c._af === par || c._am === par) ? "養子" : (c.relationToParents || "子");
+  const hasHeirBelow = (p, hm, dep = 0) => dep < 5 && M.childrenOf(p).some(c => hm.has(c.id) || hasHeirBelow(c, hm, dep + 1));
+  const kidsFor = (p, cx) => M.childrenOf(p).filter(c => !placed.has(c) && (cx.hm.has(c.id) || (c.dd && c.dd <= cx.D && hasHeirBelow(c, cx.hm))));
+  const GEN = ["子", "子", "孫", "曾孫", "玄孫"];
+  const repRel = (c, gen, sib) => (sib ? (gen === 1 ? (sexOf(c) === "女" ? "姪" : "甥") : "甥姪の子") : (GEN[gen] || "子孫")) + "・代襲者";
+  const childNode = (c, par, cx) => cx.hm.has(c.id) ? heirNode(c, childRel(c, par), cx) : repNode(c, 1, false, cx);
+  /* 被代襲者：氏名は書かず「被代襲者（○年○月○日死亡）」とし、その下に代襲者を書く */
+  const repNode = (p, gen, sib, cx) => {
+    placed.add(p);
+    const n = { lines: [{ t: "被代襲者" }, { t: `（${p.death || "死亡日未確認"}死亡）`, miss: !p.death }] };
+    const kids = M.childrenOf(p).filter(c => !placed.has(c) && (cx.hm.has(c.id) || (c.dd && c.dd <= cx.D && hasHeirBelow(c, cx.hm))));
+    n.groups = kids.length ? [{ sp: null, pos: "none", kids: kids.map(c => cx.hm.has(c.id) ? heirNode(c, repRel(c, gen + 1, sib), cx) : repNode(c, gen + 1, sib, cx)) }] : [];
+    return n;
+  };
+  const otherParentOf = (c, p) => c._father === p ? c._mother : c._mother === p ? c._father : null;
+
+  /* 配偶者ごとに子を分ける。
+     ・相続人の配偶者は、ふつうに書く
+     ・子が数次相続で亡くなり、その相続人が父母・兄弟姉妹になる場合は、関係を示すため、その子の親（配偶者）を書く
+     ・子の母（父）が2人以上いるときは「（女）」「（男）」で分ける
+     ・それ以外の、相続人でない配偶者（先に死亡・離婚）は書かない */
+  const spouseGroups = (p, kidsAll, mkKid, cx) => {
+    const groups = p._mar.slice().sort((x, y) => (x.m || 0) - (y.m || 0))
+      .map(x => ({ person: x.sp, divorced: !!(x.e && x.er && x.er !== "死亡"), kids: [] }));
+    kidsAll.forEach(c => {
+      const other = otherParentOf(c, p);
+      let g = groups.find(x => x.person && x.person === other);
+      if (!g){ g = groups.find(x => !x.person); if (!g){ g = { person: null, kids: [] }; groups.push(g); } }
+      g.kids.push(c);
+    });
+    /* 数次相続で、子の相続人が父母・兄弟姉妹になる場合に書く親 */
+    const force = new Map();
+    kidsAll.forEach(c => {
+      if (!cx.hm.has(c.id) || !combinable(c, cx)) return;
+      const plan = subOf(c);
+      if (plan.mode !== "sibling") return;
+      const other = otherParentOf(c, p);
+      if (other && !force.has(other)) force.set(other, { c, plan });
+    });
+    const active = [...groups].reverse().find(g => g.person && (cx.hm.has(g.person.id) || force.has(g.person)));
+    const otherSex = sexOf(p) === "男" ? "女" : sexOf(p) === "女" ? "男" : "配偶者";
+    const needSplit = groups.filter(g => g.kids.length).length >= 2;
+    const out = [], merged = [];
+    groups.forEach(g => {
+      const pos = g === active ? "below" : "above";
+      if (g.person && cx.hm.has(g.person.id) && !placed.has(g.person)) out.push({ sp: heirNode(g.person, spouseRelOf(p), cx), pos, kids: g.kids.map(mkKid) });
+      else if (g.person && force.has(g.person) && !placed.has(g.person)){
+        const { c, plan } = force.get(g.person);
+        const asHeir = plan.cx.hm.has(g.person.id) && !g.person.dd;
+        const sp = asHeir ? heirNode(g.person, `${c.name}の${sexOf(g.person) === "男" ? "父" : "母"}`, plan.cx) : recordNode(g.person, spouseRelOf(p));
+        out.push({ sp, pos, kids: g.kids.map(mkKid) });
+      }
+      else if (g.kids.length && needSplit && g.person) out.push({ sp: label(sexOf(g.person) || otherSex), pos: "above", kids: g.kids.map(mkKid) });
+      else merged.push(...g.kids);
+    });
+    if (merged.length) out.push({ sp: null, pos: "none", kids: merged.map(mkKid) });
+    return out;
+  };
+
+  /* 被相続人の欄 */
+  const retire = r.katoku && (dec.events || []).some(e => /隠居/.test(e.type || "") && wd(e.date) === r.katoku.date);
+  const lastSpan = (dec.spans || []).slice(-1)[0];
+  const honseki = ((lastSpan && M.docs[lastSpan.fileName]) || {}).honseki || "";
+  const lastAddr = (dec.currentAddress || {}).address || "";
+  const DL = [];
+  if (!r.katoku){
+    DL.push({ t: "最後の住所" });
+    if (lastAddr) chunk(lastAddr, 19).forEach(t => DL.push({ t })); else DL.push({ t: "（未確認）", miss: true });
+  }
+  DL.push({ t: retire ? "隠居時の本籍" : "最後の本籍" });
+  if (honseki) chunk(honseki, 19).forEach(t => DL.push({ t })); else DL.push({ t: "（未確認）", miss: true });
+  DL.push({ t: "出生　" + (dec.birth || "（未確認）"), miss: !dec.birth });
+  if (retire) DL.push({ t: "隠居　" + r.katoku.dateStr });
+  else DL.push({ t: "死亡　" + (dec.death || "（未取得）"), miss: !dec.death });
+  DL.push({ t: "（被相続人）" }); DL.push({ t: dec.name });
+  const decNode = { lines: DL };
+  placed.add(dec);
+  const cx0 = { hm: heirMap, D, owner: dec };
+
+  let root;
+  if (r.katoku){
+    const h = r.katoku.heir, isChild = h._father === dec || h._mother === dec;
+    decNode.groups = [{ sp: null, pos: "none", kids: [heirNode(h, (isChild ? "子・" : "") + "家督相続人", cx0)] }];
+    root = decNode;
+  } else if (r.rank === 2 || r.rank === 3){
+    decNode.groups = spouseGroups(dec, [], null, cx0);
+    const f = dec._father, mo = dec._mother;
+    const pNode = (q, t) => q && heirMap.has(q.id) ? heirNode(q, t, cx0) : label(t);
+    if (r.rank === 2){
+      root = pNode(f, "父");
+      root.groups = [{ sp: pNode(mo, "母"), pos: "below", kids: [decNode] }];
+    } else {
+      const pars = M.parentsOf(dec);
+      const sameF = x => (f && x._father === f) || (!f && norm(dec.father) && norm(x.father) === norm(dec.father));
+      const sameM = x => (mo && x._mother === mo) || (!mo && norm(dec.mother) && norm(x.mother) === norm(dec.mother));
+      const sibs = M.P.filter(x => x === dec || ((M.parentsOf(x).some(q => pars.includes(q)) || sameF(x) || sameM(x))
+                    && (heirMap.has(x.id) || (x.dd && x.dd <= D && hasHeirBelow(x, heirMap))))).sort((x, y) => (x.b || 0) - (y.b || 0));
+      const sibRel = k => { const older = k.b && dec.b && k.b < dec.b, sx = sexOf(k);
+        return sx === "男" ? (older ? "兄" : "弟") : sx === "女" ? (older ? "姉" : "妹") : "兄弟姉妹"; };
+      const mk = k => k === dec ? decNode : heirMap.has(k.id) ? heirNode(k, sibRel(k), cx0) : repNode(k, 0, true, cx0);
+      root = label("父");
+      const groups = [];
+      sibs.forEach(k => {
+        const key = k._mother || norm(k.mother) || "?";
+        let g = groups.find(x => x.key === key);
+        if (!g){ g = { key, own: sameM(k), kids: [] }; groups.push(g); }
+        g.kids.push(k);
+      });
+      root.groups = groups.map(g => ({ sp: label(g.own ? "母" : "女"), pos: g.own ? "below" : "above", kids: g.kids.map(mk) }));
+    }
+  } else {
+    const kids = kidsFor(dec, cx0);
+    decNode.groups = spouseGroups(dec, kids, c => childNode(c, dec, cx0), cx0);
+    root = decNode;
+  }
+
+  /* 第2・第3順位になる数次相続：その方の相続人が、全員この一覧図の中にいるか */
+  suji.forEach(s => {
+    if (s.plan.mode !== "sibling") return;
+    const missing = s.plan.heirs.filter(h => !placed.has(h.p)).map(h => h.p.name);
+    if (missing.length){ s.plan = Object.assign({}, s.plan, { mode: "separate", why: `相続人のうち${missing.join("、")}さんが図の中にいない` }); }
+  });
+  return { tree: { kind: "ichiran", decName: dec.name, root, author: opt.author, decLines: DL }, list, heirMap, honseki, lastAddr, retire, suji };
+}
+
+/* 列挙形式：被相続人と相続人を表の形で順に書く */
+function renderIchiranList(ich, banner){
+  const out = []; let y = 120 + (banner ? banner.length * 15 : 0);
+  const X1 = 120, X2 = 250, W = 420, RH = 19;
+  const table = rows => {
+    rows.forEach((row, i) => {
+      out.push(`<rect x="${X1}" y="${y}" width="${W}" height="${RH}" fill="none" stroke="#111" stroke-width="0.8"/>`);
+      out.push(`<line x1="${X2}" y1="${y}" x2="${X2}" y2="${y + RH}" stroke="#111" stroke-width="0.8"/>`);
+      out.push(`<text x="${X1 + 6}" y="${y + 14}">${esc(row[0])}</text>`);
+      out.push(`<text x="${X2 + 6}" y="${y + 14}"${row[2] ? ' fill="#c0261b"' : ""}>${esc(row[1])}</text>`);
+      y += RH;
+    });
+    y += 18;
+  };
+  const dl = ich.tree.decLines.map(l => l.t);
+  const dec = []; let lab = null;
+  dl.forEach(t => {
+    if (t === "最後の住所" || t === "最後の本籍" || t === "隠居時の本籍"){ lab = t; dec.push([t, ""]); }
+    else if (/^(出生|死亡|隠居)　/.test(t)){ const [k, v] = t.split("　"); dec.push([k, v]); lab = null; }
+    else if (t === "（被相続人）") dec.push([t, ""]);
+    else if (lab){ const row = dec[dec.length - 1]; row[1] += t; }
+    else dec[dec.length - 1][1] = t;
+  });
+  table(dec.map(r => [r[0], r[1] || "", r[1] === "（未確認）"]));
+  ich.list.forEach(({ p, rel }) => {
+    const rows = [];
+    if (ich.opt.addr && !p.dd) rows.push(["住所", (p.currentAddress || {}).address || "（未確認）", !(p.currentAddress || {}).address]);
+    rows.push(["出生", p.birth || "（未確認）", !p.birth]);
+    if (p.dd) rows.push(["死亡", p.death]);
+    rows.push([`（${rel}）`, p.name + (p.id === ich.opt.applicant ? "　（申出人）" : "")]);
+    table(rows);
+  });
+  return out.join("");
+}
+
+/* 一覧図のチェック：不足書類・足りない記載 */
+function renderIchiranCheck(aI, ich, opt){
+  const items = [];
+  const add = (k, t, s) => items.push([k, t, s]);
+  const r = aI.result, dec = aI.dec;
+  if (!ich){
+    add("bad", "一覧図を作れません", r && r.oldLaw ? "旧民法の相続で家督相続の記載が見つからないため、相続人を確定できません。" : "被相続人の死亡の記載がないなど、相続人を確定できていません。");
+  }
+  (aI.holds || []).forEach(h => add("bad", "判定保留：" + h.title, h.text));
+  /* この一覧図に関係する人（被相続人・被代襲者・記載する相続人）の不足だけを見る。数次相続の先の相続人は、その方の一覧図で確認する */
+  const inList = new Set([dec.name, ...(ich ? ich.list.map(x => x.p.name) : []), ...(aI.roles || []).filter(x => x.role === "被代襲者").map(x => x.p.name)]);
+  const needs = aI.needs.filter(n => inList.has(n.who));
+  const covNeeds = needs.filter(n => /戸籍|死亡の記載/.test(n.what) && !/現在の戸籍|住所/.test(n.what));
+  covNeeds.forEach(n => add("bad", "戸除籍謄本の不足", `${n.who}：${n.what}（${n.where}${n.head ? "　筆頭者 " + n.head : ""}）`));
+  /* 相続人の戸籍は、この被相続人の死亡（家督相続なら家督相続の日）より後に発行されたものかで確認する */
+  const D0 = r ? (r.katoku ? r.katoku.date : dec.dd) : null;
+  const curBad = [];
+  if (ich) ich.list.filter(x => !x.p.dd).forEach(({ p, after }) => {
+    const open = (p.spans || []).filter(sp => !sp.to && CURRENT_KINDS.includes((aI.M.docs[sp.fileName] || {}).kind));
+    const base = Math.max(after || 0, D0 || 0);
+    const fresh = open.find(sp => { const iss = wd((aI.M.docs[sp.fileName] || {}).issueDate); return iss && base && iss >= base; });
+    if (fresh) return;
+    curBad.push(p.name);
+    const d0 = open[0] ? aI.M.docs[open[0].fileName] : null;
+    add("bad", "相続人の戸籍の不足", `${p.name}：` + (d0 ? `手元の${open[0].fileName}は${d0.issueDate || "発行日不明"}発行で、死亡後に発行されたものか確認できません。` : "現在の戸籍（謄本または抄本）が読み取り結果にありません。"));
+  });
+  if (ich){
+    const decNeedsAddr = needs.some(n => /最後の住所/.test(n.what));
+    if (!r.katoku && decNeedsAddr)
+      add("bad", "被相続人の最後の住所", "住民票の除票（又は戸籍の附票）がありません。最後の住所は除票等で確認して記載します。除票等が廃棄されていて取れない場合は、最後の住所に代えて最後の本籍を必ず記載し、廃棄されている旨の証明書を用意してください。");
+    if (!ich.honseki) add("warn", "最後の本籍", "最後の本籍が読み取れていません（記載は任意ですが、除票等が廃棄されている場合は必須です）。");
+    ich.list.forEach(({ p }) => { if (!p.birth) add("bad", "相続人の生年月日", `${p.name}さんの生年月日が読み取れていません。一覧図に必ず記載します。`); });
+    if (opt.addr){
+      needs.filter(n => /現在の住所/.test(n.what))
+        .forEach(n => add("bad", "相続人の住所", `${n.who}：住所を記載する場合は、住民票の写し等にあるとおり書き、その住民票の写し等を提出します。${n.basis}`));
+    } else add("ok", "相続人の住所", "記載しない設定です（記載は任意）。");
+    const alive = ich.list.filter(x => !x.p.dd);
+    if (!opt.applicant || !alive.some(x => x.p.id === opt.applicant)) add("bad", "申出人", "申出人を選んでください。申出人の名前に「（申出人）」と書きます。");
+    (ich.suji || []).forEach(({ p, plan }) => {
+      const names = (plan.heirs || []).map(h => h.p.name + "さん").join("、");
+      const head = `${p.name}さんは${dec.name}さんの死亡後（${p.death}）に亡くなっているため、${dec.name}さんの相続人は${p.name}さん本人です（数次相続）。`;
+      if (plan.mode === "expand")
+        add("ok", "数次相続をまとめて記載", head + `A4 1枚に収まるため、${p.name}さんの相続人（${names}）も、${p.name}さんの下に記載しています。`);
+      else if (plan.mode === "sibling")
+        add("ok", "数次相続をまとめて記載", head + `${p.name}さんの相続人（${names}）は図の中にいる父母・兄弟姉妹などです。関係が分かるよう、${p.name}さんの親（被相続人の配偶者など）を、先に亡くなっていても記載しています。`);
+      else
+        add("warn", "数次相続（別の一覧図）", head + `${opt.combine === false && ich.combineFailed ? "A4 1枚に収まらないため、" : plan.why ? plan.why + "ため、" : ""}${p.name}さんの相続人${names ? "（" + names + "）" : ""}は、上のタブ「${p.name}」の一覧図に記載します。`);
+    });
+    const renSet = opt.renounced;
+    if (renSet && renSet.size)
+      add("warn", "相続放棄", "一覧図は戸籍の記載だけで作るため、相続放棄は反映されません。放棄した人も相続人として記載しています。登記などでは、相続放棄申述受理証明書を別に添付します。");
+    if (opt.style === "list" && r.rank === 3) add("warn", "列挙形式と兄弟姉妹", "列挙形式では、父母の一方だけを同じくする兄弟姉妹かどうかが分からないため、提出先から戸除籍謄本を求められることがあります。兄弟姉妹が相続人のときは図形式をおすすめします。");
+    if (ich.retire && dec.death) add("warn", "隠居と死亡", `隠居による家督相続と、死亡（${dec.death}）による遺産相続が両方ある場合は、原則として1枚目に家督相続、2枚目に遺産相続の一覧図を作り、「1／2」「2／2」と書きます。手続きする財産が家督相続で承継されたものだけなら、遺産相続の一覧図は省略できます。`);
+    if (ich.tree._overflow) add("warn", "用紙", "作成者の枠の下に約5cmの余白（認証文の欄）が取れていません。2枚に分けて「1／2」「2／2」と書き、続きの位置に番号を付けます。");
+    if (r.final.some(h => /養子/.test(h.how)) || ich.list.some(x => x.rel === "養子")) add("ok", "養子", "相続税の申告に一覧図の写しを使う場合、相続人である子に養子がいるときは、養子の戸籍謄抄本も必要です。");
+  }
+
+  /* 添付書類のチェックリスト */
+  const ok = b => b ? `<span class="chip good">そろい</span>` : `<span class="chip bad">不足</span>`;
+  const todo = `<span class="chip warn">要準備</span>`;
+  const decCovOk = !needs.some(n => n.who === dec.name && /戸籍|死亡の記載/.test(n.what));
+  const curOk = !curBad.length;
+  const lastOk = !needs.some(n => /最後の住所/.test(n.what));
+  const app = ich && ich.list.find(x => x.p.id === opt.applicant);
+  const appAddrOk = !!(app && app.p._addrOk);
+  const heirAddrOk = !needs.some(n => /現在の住所/.test(n.what));
+  const docs = [
+    [todo, "法定相続情報一覧図の保管及び交付の申出書"],
+    [ok(decCovOk), "被相続人の出生から死亡までの戸籍・除籍・改製原戸籍の謄本"],
+    [ok(curOk), "相続人全員の戸籍謄抄本（被相続人の死亡後に発行されたもの）"],
+    [r && r.katoku ? `<span class="chip ok">不要</span>` : ok(lastOk), "被相続人の住民票の除票（又は戸籍の附票）" + (r && r.katoku ? "　※家督相続は最後の本籍で記載" : "")],
+    [app ? ok(appAddrOk) : `<span class="chip bad">申出人未選択</span>`, "申出人の氏名・住所を確認できる書類（住民票の写し、運転免許証の写しなど）"],
+    [opt.addr ? ok(heirAddrOk) : `<span class="chip ok">不要</span>`, "相続人の住民票の写し等（一覧図に相続人の住所を書く場合）"],
+    [todo, "代理人が申し出る場合：委任状、資格者代理人であることを確認できる書類（司法書士法人なら法人の登記事項証明書など）"]
+  ];
+  const bad = items.filter(i => i[0] === "bad").length;
+  $("ichiranCheck").innerHTML = `<h2>法定相続情報一覧図のチェック${bad ? `<span class="count">要対応 ${bad}件</span>` : ""}</h2>` +
+    (items.length ? items.map(noteHtml).join("") : `<p class="note"><span class="chip good">OK</span>指摘はありません。</p>`) +
+    `<h2 style="margin-top:14px">申出に必要な書類</h2><ul class="checklist">${docs.map(d => `<li>${d[0]}<span>${esc(d[1])}</span></li>`).join("")}</ul>
+     <p class="hint">一覧図は、提出した戸除籍謄本の記載だけで作ります。相続放棄や遺産分割協議は対象外で、持分も書きません。数次相続のときは、被相続人ごとに作ります。</p>`;
+}
+
+/* ---------- サイドパネル ---------- */
+const CHIP = { ok: "参考", warn: "確認", bad: "要注意", good: "OK" };
+const noteHtml = ([k, t, s]) => `<p class="note"><span class="chip ${k}">${CHIP[k]}</span><b>${esc(t)}</b>　${esc(s)}</p>`;
+
+function renderHold(a){
+  const hs = a.holds || [];
+  const box = $("hold");
+  if (!hs.length){ box.hidden = true; box.innerHTML = ""; return; }
+  box.hidden = false;
+  box.innerHTML = `<h2>判定を保留している点があります（${hs.length}件）</h2>
+    <ul>${hs.map(h => `<li><b>${esc(h.title)}</b>　${esc(h.text)}</li>`).join("")}</ul>
+    <p>この図と持分は暫定です。「次に必要な戸籍」をそろえるか、読み取り結果を直してから、もう一度確認してください。</p>`;
+}
+function renderVerdict(a){
+  const r = a.result;
+  if (!r){
+    $("verdict").innerHTML = `<h2>相続人と持分</h2><p class="note">計算できませんでした。理由は「確認事項」を見てください。</p>`;
+    return;
+  }
+  const region = r.okinawa ? `<dt>適用地域</dt><dd>${esc(r.okinawa.v ? "沖縄県" : "沖縄県以外")}<span style="font-weight:400;color:var(--muted)">（${esc(r.okinawa.how)}）</span></dd>` : "";
+  if (r.oldLaw){
+    $("verdict").innerHTML = `<h2>相続人と持分</h2>
+      <dl class="facts"><dt>適用した法律</dt><dd><span class="chip bad">家督相続</span>${esc(ERA_LABEL[r.era])}</dd>${region}</dl>
+      <p class="note">${esc(r.era === "old_okinawa" ? OKINAWA_KATOKU_NOTE : "昭和22年5月2日以前に開始した相続には、旧民法（家督相続制度）が適用されます。")}</p>
+      <p class="note">戸主の死亡なら家督相続（原則として家督相続人1人が承継）、家族の死亡なら遺産相続になります。この試作では相続人と持分を自動計算していません。図には、その旨を確認用の注記として入れています。</p>`;
+    return;
+  }
+  const L = r.lcd;
+  const katokuChip = r.katoku ? `<span class="chip bad">家督相続</span>` : "";
+  const rows = r.final.map(h => `<tr><td>${esc(h.p.name)}</td><td class="how">${esc(h.how)}</td><td class="num">${esc(fstr(h.share))}</td><td class="num">${L}分の${h.share.n * (L / h.share.d)}</td></tr>`).join("");
+  const sumOk = r.sum.n === r.sum.d;
+  const holdN = (a.holds || []).length;
+  $("verdict").innerHTML = `<h2>相続人と持分${holdN ? `<span class="chip bad" style="margin-left:8px">暫定・保留${holdN}件</span>` : ""}</h2>
+    <dl class="facts"><dt>適用した法律</dt><dd>${katokuChip}${esc(ERA_LABEL[r.era])}</dd>
+    ${region}<dt>${r.katoku ? "家督相続" : "相続順位"}</dt><dd>${esc(r.katoku ? r.katoku.dateStr + "　家督相続人 " + r.katoku.heir.name + "さん（単独で全部を承継）" : r.rank ? RANK_LABEL[r.rank] : "配偶者のみ／なし")}</dd></dl>
+    <div class="tbl-scroll"><table><tr><th>相続人</th><th>根拠</th><th>持分</th><th>共通分母</th></tr>${rows}
+    <tr class="total"><td colspan="2">合計</td><td class="num" colspan="2"><span class="chip ${sumOk ? "good" : "bad"}">${sumOk ? "合計が1になっています" : "合計が1になりません：" + esc(fstr(r.sum))}</span></td></tr></table></div>
+    ${holdN ? `<p class="hint" style="color:var(--bad);font-weight:700">判定を保留している点があるため、この持分は暫定です。図の上の赤い枠の内容を確認してください。</p>` : ""}`;
+}
+function renderNeeds(a, ai){
+  const n = a.needs;
+  let html = `<h2>次に必要な戸籍<span class="count">${n.length ? n.length + "件" : ""}</span></h2>`;
+  html += n.length ? `<ul class="miss">` + n.map(m =>
+    `<li><b>${esc(m.who)}：${esc(m.what)}</b>${esc(m.where)}${m.head ? "　筆頭者 " + esc(m.head) : ""}<div class="why">理由：${esc(m.why)}<br>根拠：${esc(m.basis)}</div></li>`).join("") + `</ul>`
+    : `<p class="note"><span class="chip good">OK</span>判定に必要な戸籍はそろっています。</p>`;
+  if (ai && ai.length){
+    html += `<details style="margin-top:10px"><summary>読み取り時のAIの指摘（参考・${ai.length}件）</summary><ul class="miss" style="margin-top:8px">` +
+      ai.map(k => `<li><b>${esc(k.forPerson)}${k.period ? "（" + esc(k.period) + "）" : ""}</b>${esc(k.honseki)}　筆頭者 ${esc(k.hittousha)}<div class="why">${esc(k.reason)}</div></li>`).join("") + `</ul></details>`;
+  }
+  $("needs").innerHTML = html;
+}
+function renderChecks(notes){
+  $("checks").innerHTML = `<h2>確認事項</h2>` + (notes.length ? notes.map(noteHtml).join("") : `<p class="note">確認事項はありません。</p>`);
+}
+function renderPeopleReading(a){
+  const decId = a.dec.id, ren = renOf(decId);
+  $("people").innerHTML = `<tr><th>放棄</th><th>氏名</th><th>続柄</th><th>出生</th><th>死亡</th><th>読み取り元</th></tr>` +
+    a.M.P.map(p => `<tr><td>${p.id === decId ? "" : `<input type="checkbox" id="ren-${esc(p.id)}" data-id="${esc(p.id)}" aria-label="${esc(p.name)}さんの相続放棄（${esc(a.dec.name)}さんの相続）"${ren.has(p.id) ? " checked" : ""}>`}</td>
+      <td>${esc(p.name)}${p.id === decId ? "（被相続人）" : ""}</td><td>${esc(p.relationToParents || "")}</td><td>${esc(p.birth || "")}</td><td>${esc(p.death || "—")}</td>
+      <td class="src${p.onlyInOldRegister ? " flag" : ""}">${esc((p.appearsIn || []).join("、"))}${p.onlyInOldRegister ? "（改製原・除籍のみ）" : ""}</td></tr>`).join("");
+  $("people").querySelectorAll("input[type=checkbox]").forEach(cb => cb.addEventListener("change", () => {
+    const r = renOf(decId, true);
+    if (cb.checked) r.add(cb.dataset.id); else r.delete(cb.dataset.id);
+    draw();
+  }));
+  $("renHint").textContent = `放棄のチェックは「${a.dec.name}さんの相続」についてだけ反映します。相続放棄は戸籍に載らないため、家庭裁判所の受理証明書で確認してください。`;
+}
+function renderPeopleStatic(tree){
+  const rows = [];
+  const walk = (p, role) => {
+    rows.push({ role, p });
+    if (p.spouse) rows.push({ role: p.spouse.rel + "（" + p.name + "の配偶者）", p: p.spouse });
+    (p.children || []).forEach(c => walk(c, c.rel + "（" + p.name + "の子）"));
+  };
+  walk(tree.root, "被相続人");
+  $("people").innerHTML = `<tr><th>立場</th><th>氏名</th><th>出生</th><th>死亡</th><th>読み取り元</th></tr>` +
+    rows.map(({ role, p }) => `<tr><td>${esc(role)}</td><td>${esc(p.name)}</td><td>${esc(p.birth)}</td><td>${esc(p.death || "—")}</td><td class="src">${esc(p.src || "")}</td></tr>`).join("");
+}
+
+/* ---------- 状態と操作 ---------- */
+const state = { mode: "reading", reading: clone(SAMPLE_YAMASHIRO), decedentId: "p1", currentId: "p1", extra: [], label: SAMPLES.yamashiro.label,
+                renouncedBy: {}, showShare: true, region: "auto", suekichi: clone(SUEKICHI),
+                doc: "souzoku", ichi: { style: "zu", addr: true, combine: true, date: warekiToday(),
+                  author: { name: "司法書士法人エクリ", member: "社員　名嘉章雄", office: "沖縄県那覇市首里石嶺町二丁目261番地6" } }, applicantBy: {} };
+const renOf = (id, create) => state.renouncedBy[id] || (create ? (state.renouncedBy[id] = new Set()) : new Set());
+const optFor = () => ({ renouncedBy: state.renouncedBy, region: state.region });
+
+function fillDecedentSelect(){
+  $("decedent").innerHTML = (state.reading.persons || []).map(p =>
+    `<option value="${esc(p.id)}"${p.id === state.decedentId ? " selected" : ""}>${esc(p.name)}（${esc(p.death ? p.death + " 死亡" : "生存")}）</option>`).join("");
+}
+
+/* 案件の被相続人：最初の被相続人＋数次相続・代襲相続で出てくる亡くなった方＋手で追加した方 */
+function estateList(primary){
+  const byId = Object.fromEntries(primary.M.P.map(p => [p.id, p]));
+  const list = [{ p: primary.dec, role: "最初の相続", from: null }];
+  primary.roles.forEach(r => list.push(r));
+  state.extra.forEach(id => { if (byId[id] && !list.some(x => x.p.id === id)) list.push({ p: byId[id], role: "追加", from: null }); });
+  return list.sort((x, y) => (x.p.dd || 99999999) - (y.p.dd || 99999999));
+}
+function roleText(e){
+  if (!e || e.role === "最初の相続") return "最初の相続";
+  if (e.role === "数次相続") return `数次相続（${e.from.name}さんの相続人）`;
+  if (e.role === "被代襲者") return `被代襲者（${e.from.name}さんより先に死亡）`;
+  return "手で追加";
+}
+function renderTabs(list, current){
+  $("tabs").innerHTML = list.map((e, i) => {
+    let k = "";
+    try {
+      const a = e.p.id === current.dec.id ? current : analyze(state.reading, e.p.id, optFor());
+      const n = a.needs.length, hn = (a.holds || []).length;
+      k = (hn ? `<span class="k held">判定保留 ${hn}件</span>` : "") + (n ? `<span class="k bad">不足 ${n}件</span>` : `<span class="k good">戸籍そろい</span>`);
+    } catch (er) {}
+    return `<button class="tab" type="button" role="tab" id="tab-${esc(e.p.id)}" data-id="${esc(e.p.id)}" aria-selected="${e.p.id === state.currentId}">
+      <span class="n">${i + 1}　${esc(e.p.name)}</span><span class="r">${esc(e.p.death ? e.p.death + " 死亡" : "生存")}・${esc(roleText(e))}</span>${k}</button>`;
+  }).join("");
+  $("tabs").querySelectorAll(".tab").forEach(b => b.addEventListener("click", () => { state.currentId = b.dataset.id; draw(); }));
+  const inList = new Set(list.map(e => e.p.id));
+  const others = (state.reading.persons || []).filter(p => p.death && !inList.has(p.id));
+  $("addDec").innerHTML = `<option value="">${others.length ? "選んでください" : "追加できる方はいません"}</option>` +
+    others.map(p => `<option value="${esc(p.id)}">${esc(p.name)}（${esc(p.death)} 死亡）</option>`).join("");
+  $("addDec").disabled = !others.length;
+}
+
+function draw(){
+  const show = m => ["loader", "gem", "verdict", "needs", "estate", "papertools"].forEach(id => $(id).hidden = m);
+  if (state.mode === "suekichi"){ $("ichitools").hidden = true; $("ichiranCheck").hidden = true; }
+  $("hold").hidden = true;
+  if (state.mode === "suekichi"){
+    show(true); $("renHint").hidden = true;
+    $("paper").innerHTML = renderPaper(state.suekichi);
+    renderChecks(SUEKICHI_NOTES);
+    renderPeopleStatic(state.suekichi);
+    $("cap").textContent = "送っていただいた見本と同じ人物データで、事務所の様式どおりに描けるかを確かめる表示です（相続人の判定はしていません）。";
+    return;
+  }
+  show(false); $("renHint").hidden = false;
+  try {
+    const primary = analyze(state.reading, state.decedentId, optFor());
+    const list = estateList(primary);
+    if (!list.some(e => e.p.id === state.currentId)) state.currentId = state.decedentId;
+    const a = state.currentId === state.decedentId ? primary : analyze(state.reading, state.currentId, optFor());
+    renderTabs(list, a);
+    const { tree, outside } = buildDrawTree(a, { showShare: state.showShare, renounced: renOf(a.dec.id) });
+    const notes = a.notes.slice();
+    if (outside.length) notes.push(["warn", "図に入っていない相続人", outside.join("、") + "さんは図の範囲の外にいます。持分は表に出ています。"]);
+    const ichi = state.doc === "ichiran";
+    $("ichitools").hidden = !ichi; $("ichiranCheck").hidden = !ichi;
+    $("shareSeg").hidden = ichi; $("shareLabel").hidden = ichi;
+    if (ichi){
+      /* 一覧図は戸籍の記載だけで作るので、相続放棄を外して判定し直す */
+      const aI = analyze(state.reading, a.dec.id, { renouncedBy: Object.assign({}, state.renouncedBy, { [a.dec.id]: new Set() }), region: state.region });
+      const opt = { addr: state.ichi.addr, applicant: state.applicantBy[a.dec.id] || "", style: state.ichi.style, renounced: renOf(a.dec.id),
+                    author: Object.assign({ date: state.ichi.date }, state.ichi.author), reading: state.reading, region: state.region,
+                    combine: state.ichi.combine && state.ichi.style !== "list" };
+      let ich = buildIchiran(aI, opt), combineFailed = false;
+      if (ich && opt.combine && ich.suji.some(x => x.plan.mode !== "separate")){
+        const probe = { kind: "ichiran", decName: a.dec.name, root: ich.tree.root, author: opt.author };
+        renderPaper(probe);
+        if (probe._overflow){ opt.combine = false; opt.autoSplit = true; combineFailed = true; ich = buildIchiran(aI, opt); }
+      }
+      if (ich) ich.combineFailed = combineFailed;
+      const heirsAlive = ich ? ich.list.filter(x => !x.p.dd).map(x => x.p) : [];
+      if (!heirsAlive.some(p => p.id === opt.applicant)) opt.applicant = "";
+      $("applicant").innerHTML = `<option value="">選んでください</option>` + heirsAlive.map(p => `<option value="${esc(p.id)}"${p.id === opt.applicant ? " selected" : ""}>${esc(p.name)}</option>`).join("");
+      if (ich && opt.applicant) ich = buildIchiran(aI, opt);
+      if (ich) ich.combineFailed = combineFailed;
+      /* 一覧図は被相続人ごとなので、この一覧図に出てくる人に関係する保留だけを見る（数次相続の先の保留は、その方のタブで確認） */
+      if (ich){
+        const rel = [a.dec.name, ...ich.list.map(x => x.p.name), ...(aI.roles || []).filter(x => x.role === "被代襲者").map(x => x.p.name)];
+        aI.holds = (aI.holds || []).filter(h => rel.some(n => h.text.includes(n)));
+        a.holds = aI.holds;
+      }
+      const banner = (aI.holds && aI.holds.length) ? [`※ 暫定：判定を保留している点が${aI.holds.length}件あります。このまま提出しないでください。`] : null;
+      if (ich){
+        ich.opt = opt; ich.tree.banner = banner;
+        if (state.ichi.style === "list"){
+          const d = { decName: a.dec.name, author: opt.author, banner };
+          const body = renderIchiranList(ich, banner);
+          const maxY = (body.match(/y="(\d+(?:\.\d+)?)"/g) || []).map(v => +v.slice(3, -1)).reduce((m, v) => Math.max(m, v), 0) + 6;
+          $("paper").innerHTML = ichiranSheet(d, body, maxY, 1273);
+          ich.tree._overflow = d._overflow;
+        } else $("paper").innerHTML = renderPaper(ich.tree);
+      } else $("paper").innerHTML = `<p class="note" style="padding:16px">相続人を確定できないため、法定相続情報一覧図を作れません。右側の「法定相続情報一覧図のチェック」を確認してください。</p>`;
+      renderIchiranCheck(aI, ich, opt);
+    } else $("paper").innerHTML = renderPaper(tree);
+    renderHold(a);
+    renderVerdict(a);
+    renderNeeds(a, state.currentId === state.decedentId ? state.reading.nextKoseki : null);
+    renderChecks(notes);
+    renderPeopleReading(a);
+    const cur = list.find(e => e.p.id === state.currentId);
+    $("cap").textContent = `${a.dec.name}さんの相続の図です（${roleText(cur)}）。相続人と持分は、${a.dec.name}さんの死亡日に適用される法律のルールで計算しています。AIは戸籍の記載を読み取るだけで、判定はしていません。`;
+  } catch (e){
+    $("paper").innerHTML = "";
+    renderChecks([["bad", "読み取り結果を処理できません", e.message]]);
+  }
+}
+function showEditor(){
+  $("json").value = JSON.stringify(state.mode === "reading" ? state.reading : state.suekichi, null, 2);
+  $("err").hidden = true;
+}
+function setMode(m){
+  state.mode = m;
+  $("b-reading").setAttribute("aria-pressed", m === "reading");
+  $("b-suekichi").setAttribute("aria-pressed", m === "suekichi");
+  showEditor(); draw();
+}
+function loadReading(obj, label, decId){
+  if (!obj || !Array.isArray(obj.persons) || !obj.persons.length) throw new Error("persons（人物）が見つかりません。GASの読み取り結果のJSONを選んでください。");
+  state.reading = obj; state.label = label; state.renouncedBy = {}; state.extra = [];
+  state.decedentId = decId && obj.persons.some(p => p.id === decId) ? decId : (obj.persons.find(p => p.death) || obj.persons[0]).id;
+  state.currentId = state.decedentId;
+  $("source").textContent = "表示中：" + label;
+  fillDecedentSelect(); showEditor(); draw();
+}
+
+$("b-reading").addEventListener("click", () => setMode("reading"));
+$("b-suekichi").addEventListener("click", () => setMode("suekichi"));
+$("sample").addEventListener("change", e => { const s = SAMPLES[e.target.value]; loadReading(clone(s.data), s.label, s.dec); });
+$("decedent").addEventListener("change", e => { state.decedentId = state.currentId = e.target.value; state.extra = []; draw(); });
+$("addDec").addEventListener("change", e => { const id = e.target.value; if (!id) return; state.extra.push(id); state.currentId = id; draw(); });
+$("region").addEventListener("change", e => { state.region = e.target.value; draw(); });
+const press = (on, off) => { $(on).setAttribute("aria-pressed", "true"); $(off).setAttribute("aria-pressed", "false"); };
+$("doc-souzoku").addEventListener("click", () => { state.doc = "souzoku"; press("doc-souzoku", "doc-ichiran"); draw(); });
+$("doc-ichiran").addEventListener("click", () => { state.doc = "ichiran"; press("doc-ichiran", "doc-souzoku"); draw(); });
+$("style-zu").addEventListener("click", () => { state.ichi.style = "zu"; press("style-zu", "style-list"); draw(); });
+$("style-list").addEventListener("click", () => { state.ichi.style = "list"; press("style-list", "style-zu"); draw(); });
+$("comb-on").addEventListener("click", () => { state.ichi.combine = true; press("comb-on", "comb-off"); draw(); });
+$("comb-off").addEventListener("click", () => { state.ichi.combine = false; press("comb-off", "comb-on"); draw(); });
+$("addr-on").addEventListener("click", () => { state.ichi.addr = true; press("addr-on", "addr-off"); draw(); });
+$("addr-off").addEventListener("click", () => { state.ichi.addr = false; press("addr-off", "addr-on"); draw(); });
+$("applicant").addEventListener("change", e => { state.applicantBy[state.currentId] = e.target.value; draw(); });
+$("madeDate").value = state.ichi.date;
+$("madeDate").addEventListener("change", e => { state.ichi.date = e.target.value; draw(); });
+[["authName", "name"], ["authMember", "member"], ["authOffice", "office"]].forEach(([id, k]) => {
+  $(id).value = state.ichi.author[k];
+  $(id).addEventListener("change", e => { state.ichi.author[k] = e.target.value; draw(); });
+});
+const setShare = v => { state.showShare = v; $("share-on").setAttribute("aria-pressed", v); $("share-off").setAttribute("aria-pressed", !v); draw(); };
+$("share-on").addEventListener("click", () => setShare(true));
+$("share-off").addEventListener("click", () => setShare(false));
+$("file").addEventListener("change", e => {
+  const f = e.target.files && e.target.files[0]; if (!f) return;
+  const fr = new FileReader();
+  fr.onload = () => {
+    try { loadReading(JSON.parse(fr.result), f.name); }
+    catch (er){ $("source").textContent = "読み込めませんでした：" + er.message; }
+  };
+  fr.readAsText(f, "utf-8");
+  e.target.value = "";
+});
+const GEM_TEXT = "あなたは沖縄県の司法書士事務所で、相続案件の戸籍を読み取る担当者です。\nアップロードされた資料（戸籍の全部事項証明、改製原戸籍、除籍謄本、住民票、住民票の除票、戸籍の附票など）をすべて横断して読み、下の「出力の形」のJSONだけを出力してください。\n\n# 出力のしかた\n- 回答は ```json で始まり ``` で終わるJSONのコードブロック1つだけにする。説明文や前置きは書かない。\n- 項目名は「出力の形」と同じにする。書かれていない項目は空文字 \"\" 、該当がない配列は [] にする。\n- 資料が多くて途中で切れそうな場合も、JSONが閉じた形になるように出力する。\n\n# 守ること\n- 資料に書いてあることだけを書く。推測で補わない。\n- 読めない文字・自信がない文字は、読んだ結果を入れたうえで uncertain に必ず登録する。\n- 日付は和暦のまま、数字は算用数字にする（例：平成弐拾参年四月壱日 → 平成23年4月1日）。元年は「元年」のままでよい。\n- 本籍の番地も算用数字にする（例：蒲田五丁目十三番地 → 蒲田五丁目13番地）。丁目の漢数字はそのままでよい。\n- 資料の種類は末尾の認証文で判定する（「改製原戸籍の原本と相違ない」→ 改製原戸籍、など）。\n- 資料ごとに、認証文の日付（発行日）を issueDate に入れる。\n- fileName には、アップロードされたファイル名を入れる。1つのPDFに複数の戸籍が入っている場合は「ファイル名 1頁」のようにページで分ける。\n\n# 人物（persons）\n- 資料をまたいで同じ人は1人にまとめる。氏名・生年月日・父母で照合する。id は p1, p2 … の連番。\n- 婚姻・養子縁組などで氏が変わった人は、現在の氏名を name に、以前の氏名を formerNames に入れる。妻の氏・夫の氏で新戸籍を編製した記載がある場合は、相手の氏を現在の氏とする。\n- 父母は【父】【母】欄の氏名を father・mother に入れる。古い戸籍で父母欄の氏が省略されている場合（例：母欄が「梅子」だけ）は、父の氏など戸籍上明らかな氏を補って「甲野梅子」のように氏名を完全にする。養父母は adoptiveFather・adoptiveMother、縁組日は adoptionDate に入れる。\n- 父母との続柄が「男」「女」のみ、または嫡出でない子と分かる記載の場合は legitimate を false、それ以外は true にする。\n- 改製後の戸籍に載っておらず、改製原戸籍・除籍にだけ載っている人は onlyInOldRegister を true にする（相続人の見落としにつながるため特に注意する）。\n- 婚姻は marriages に、相手の id・相手の氏名（spouseName）・婚姻日・婚姻が終わった日と理由を入れる。理由は「協議離婚」「調停離婚」「審判離婚」「判決離婚」「和解離婚」「認諾離婚」「死亡」のように、戸籍の記載どおりに書く。\n- 婚姻の相手（前妻・前夫を含む）が資料に載っていれば、人物として persons に登録する。同姓同名の別人と混同しないよう、生年月日・父母で区別する。相手が資料に人物として載っていない場合も、spouseName に氏名を入れる。\n- 身分事項（出生、婚姻、離婚、養子縁組、離縁、認知、死亡、失踪、転籍、分籍、除籍、推定相続人廃除、家督相続、隠居など）を events に入れる。家督相続は届出日ではなく相続の日を date に入れる。\n- 前後の戸籍の手がかり（従前戸籍、新本籍、転籍元、入籍元）は relatedHonseki・relatedHittousha に必ず入れる。\n\n# 戸籍に載っている期間（spans）※最重要\n- 人物ごと・資料ごとに、その戸籍に入った日と理由、出た日と理由を spans に入れる。相続人の判定と不足戸籍の判定に使う。\n- 入った理由の例：出生、婚姻、転籍、改製、養子縁組、分籍、編製。出た理由の例：死亡、婚姻、転籍、改製、養子縁組、分籍、除籍。\n- 戸籍が改製・転籍で閉じられた場合は、その日を出た日とする。まだその戸籍にいる場合は to と toReason を \"\" にする。\n- 筆頭者や婚姻で編製された戸籍の夫婦は、編製日（婚姻日・転籍日・改製日）を入った日とする。\n\n# 住所（currentAddress）\n- 住民票・戸籍の附票がある人は、現在の住所（附票なら消除されていない最後の住所）を currentAddress に入れ、読み取り元のファイル名も入れる。消除された古い住所は入れない。\n- 死亡した人は、住民票の除票・戸籍の附票にある最後の住所を入れる。\n- 戸籍には住所が書かれていないので、戸籍だけの人は address を \"\" にする。\n\n# 次に必要な戸籍（nextKoseki）\n- 資料に出てくる人物のうち、手元の資料で前後がつながっていない部分を、本籍・筆頭者・理由とともに挙げる（参考情報として使う）。\n\n# 出力の形\n```json\n{\n  \"documents\": [\n    { \"fileName\": \"\", \"kind\": \"全部事項証明｜個人事項証明｜改製原戸籍｜除籍謄本｜戸籍謄本｜戸籍抄本｜住民票｜住民票の除票｜戸籍の附票｜戸籍の附票の除票｜その他 のいずれか\",\n      \"issueDate\": \"\", \"honseki\": \"\", \"hittousha\": \"\", \"registerEvents\": \"戸籍事項（編製・転籍・改製・消除など）の要約\" }\n  ],\n  \"persons\": [\n    { \"id\": \"p1\", \"name\": \"\", \"formerNames\": [], \"birth\": \"\", \"death\": \"\",\n      \"father\": \"\", \"mother\": \"\", \"relationToParents\": \"長男など\", \"legitimate\": true,\n      \"adoptiveFather\": \"\", \"adoptiveMother\": \"\", \"adoptionDate\": \"\",\n      \"marriages\": [ { \"spouseId\": \"p2\", \"spouseName\": \"\", \"married\": \"\", \"ended\": \"\", \"endReason\": \"｜協議離婚｜調停離婚｜審判離婚｜判決離婚｜和解離婚｜認諾離婚｜死亡\" } ],\n      \"spans\": [ { \"fileName\": \"\", \"from\": \"\", \"fromReason\": \"\", \"to\": \"\", \"toReason\": \"\" } ],\n      \"currentAddress\": { \"address\": \"\", \"fileName\": \"\" },\n      \"events\": [ { \"type\": \"\", \"date\": \"\", \"detail\": \"\", \"relatedHonseki\": \"\", \"relatedHittousha\": \"\" } ],\n      \"onlyInOldRegister\": false, \"appearsIn\": [] }\n  ],\n  \"nextKoseki\": [ { \"forPerson\": \"\", \"period\": \"\", \"honseki\": \"\", \"hittousha\": \"\", \"reason\": \"\" } ],\n  \"uncertain\": [ { \"fileName\": \"\", \"location\": \"\", \"reading\": \"\", \"reason\": \"\" } ]\n}\n```\n";
+$("gemText").value = GEM_TEXT;
+$("copyGem").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(GEM_TEXT); $("copyMsg").textContent = "コピーしました。Gemの指示に貼り付けてください。"; }
+  catch (e) {
+    const t = $("gemText"); t.classList.remove("sr"); t.style.minHeight = "160px"; t.focus(); t.select();
+    $("copyMsg").textContent = "自動でコピーできませんでした。表示した指示文を選択してコピーしてください。";
+  }
+});
+/* Geminiの回答から JSON 部分を取り出す（```json の囲みや前後の説明文があっても読める） */
+function extractJson(text){
+  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  let body = fence ? fence[1] : text;
+  const i = body.indexOf("{"), j = body.lastIndexOf("}");
+  if (i < 0 || j < i) throw new Error("回答の中にJSONが見つかりません。");
+  body = body.slice(i, j + 1).replace(/,\s*([}\]])/g, "$1");
+  return JSON.parse(body);
+}
+$("gemApply").addEventListener("click", () => {
+  const err = $("gemErr");
+  try {
+    const d = extractJson($("gemPaste").value);
+    loadReading(d, "Geminiアプリの読み取り結果（" + new Date().toLocaleString("ja-JP") + "）");
+    err.hidden = true;
+  } catch (e) {
+    err.textContent = "読み込めませんでした：" + e.message + " 回答が途中で切れている場合は、Geminiに「JSONだけをもう一度、最後まで出力してください」と頼んでください。";
+    err.hidden = false;
+  }
+});
+$("apply").addEventListener("click", () => {
+  try {
+    const d = JSON.parse($("json").value);
+    if (state.mode === "reading") loadReading(d, state.label + "（編集済み）", state.decedentId);
+    else {
+      if (!d.root || !d.root.name) throw new Error("root.name（被相続人の氏名）がありません。");
+      state.suekichi = d; draw();
+    }
+    $("err").hidden = true;
+  } catch (e){ $("err").textContent = "反映できませんでした：" + e.message + " JSONの書式を確認してください。"; $("err").hidden = false; }
+});
+
+$("source").textContent = "表示中：" + state.label;
+fillDecedentSelect();
+setMode("reading");
+</script>
+
+</body>
+</html>
